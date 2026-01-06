@@ -1,9 +1,74 @@
 /* ElevenPage Reader - Highlight Styles */
+/* Visual highlighting for sentence and word during audio playback */
 
+/* Sentence highlight - subtle background to show current sentence */
 .elevenlabs-sentence-highlight {
-  /* Sentence highlight styling will be defined here */
+  background-color: rgba(255, 235, 59, 0.3); /* Light yellow background */
+  border-radius: 3px;
+  padding: 2px 0;
+  transition: background-color 0.15s ease-in-out;
 }
 
+/* Word highlight - more prominent to show exact word being spoken */
 .elevenlabs-word-highlight {
-  /* Word highlight styling will be defined here */
+  background-color: rgba(33, 150, 243, 0.5); /* Blue background */
+  border-radius: 2px;
+  padding: 1px 2px;
+  margin: 0 -2px;
+  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.3);
+  transition: background-color 0.1s ease-in-out, box-shadow 0.1s ease-in-out;
+}
+
+/* Ensure word highlight is visually distinct when inside sentence highlight */
+.elevenlabs-sentence-highlight .elevenlabs-word-highlight {
+  background-color: rgba(33, 150, 243, 0.6);
+  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.4);
+}
+
+/* Base styles for wrapped sentence spans */
+.elevenlabs-sentence {
+  display: inline;
+}
+
+/* Base styles for wrapped word spans */
+.elevenlabs-word {
+  display: inline;
+  cursor: default;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .elevenlabs-sentence-highlight {
+    background-color: rgba(255, 235, 59, 0.5);
+    outline: 2px solid #ffc107;
+  }
+
+  .elevenlabs-word-highlight {
+    background-color: rgba(33, 150, 243, 0.7);
+    outline: 2px solid #2196f3;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .elevenlabs-sentence-highlight,
+  .elevenlabs-word-highlight {
+    transition: none;
+  }
+}
+
+/* Dark mode support - detect via color scheme preference */
+@media (prefers-color-scheme: dark) {
+  .elevenlabs-sentence-highlight {
+    background-color: rgba(255, 235, 59, 0.25);
+  }
+
+  .elevenlabs-word-highlight {
+    background-color: rgba(100, 181, 246, 0.5);
+    box-shadow: 0 0 0 2px rgba(100, 181, 246, 0.3);
+  }
+
+  .elevenlabs-sentence-highlight .elevenlabs-word-highlight {
+    background-color: rgba(100, 181, 246, 0.6);
+  }
 }
