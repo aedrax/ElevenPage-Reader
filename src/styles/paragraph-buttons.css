@@ -1,5 +1,127 @@
 /* ElevenPage Reader - Paragraph Button Styles */
 
+/* Wrapper for paragraph and button positioning */
+.elevenlabs-paragraph-wrapper {
+  position: relative;
+  display: block;
+}
+
+/* Paragraph button base styles */
 .elevenlabs-paragraph-button {
-  /* Paragraph button styling will be defined here */
+  position: absolute;
+  left: -32px;
+  top: 50%;
+  transform: translateY(-50%);
+  
+  /* Size and shape */
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  
+  /* Colors */
+  background-color: #4a90d9;
+  color: white;
+  
+  /* Layout */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  /* Visibility - hidden by default */
+  opacity: 0;
+  visibility: hidden;
+  
+  /* Transitions */
+  transition: opacity 0.2s ease, visibility 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
+  
+  /* Cursor */
+  cursor: pointer;
+  
+  /* Prevent text selection */
+  user-select: none;
+  
+  /* Z-index to appear above content */
+  z-index: 1000;
+}
+
+/* Button icon */
+.elevenlabs-paragraph-button svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+/* Show button on paragraph hover */
+.elevenlabs-paragraph-wrapper:hover .elevenlabs-paragraph-button {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Button hover state */
+.elevenlabs-paragraph-button:hover {
+  background-color: #357abd;
+  transform: translateY(-50%) scale(1.1);
+}
+
+/* Button active/pressed state */
+.elevenlabs-paragraph-button:active {
+  background-color: #2a5f8f;
+  transform: translateY(-50%) scale(0.95);
+}
+
+/* Button focus state for accessibility */
+.elevenlabs-paragraph-button:focus {
+  outline: 2px solid #4a90d9;
+  outline-offset: 2px;
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Focus visible for keyboard navigation */
+.elevenlabs-paragraph-button:focus-visible {
+  outline: 2px solid #4a90d9;
+  outline-offset: 2px;
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Minimal visibility when not hovering (subtle indicator) */
+.elevenlabs-paragraph-wrapper .elevenlabs-paragraph-button {
+  opacity: 0.15;
+  visibility: visible;
+}
+
+/* Full visibility on wrapper hover */
+.elevenlabs-paragraph-wrapper:hover .elevenlabs-paragraph-button {
+  opacity: 1;
+}
+
+/* Responsive adjustments for narrow viewports */
+@media (max-width: 768px) {
+  .elevenlabs-paragraph-button {
+    left: -28px;
+    width: 20px;
+    height: 20px;
+  }
+  
+  .elevenlabs-paragraph-button svg {
+    width: 10px;
+    height: 10px;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .elevenlabs-paragraph-button {
+    border: 2px solid currentColor;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .elevenlabs-paragraph-button {
+    transition: none;
+  }
 }
