@@ -190,9 +190,22 @@ describe('Popup Module - Property Tests', () => {
     });
 
     it('should display the correct name for each voice', () => {
+      // Generate voices with unique voice_ids (as ElevenLabs API would return)
+      const uniqueVoicesArbitrary = fc.array(voiceArbitrary, { minLength: 1, maxLength: 50 })
+        .map(voices => {
+          // Deduplicate by voice_id, keeping first occurrence
+          const seen = new Set();
+          return voices.filter(v => {
+            if (seen.has(v.voice_id)) return false;
+            seen.add(v.voice_id);
+            return true;
+          });
+        })
+        .filter(voices => voices.length > 0);
+
       fc.assert(
         fc.property(
-          fc.array(voiceArbitrary, { minLength: 1, maxLength: 50 }),
+          uniqueVoicesArbitrary,
           (voices) => {
             const select = document.getElementById('voice-select');
             

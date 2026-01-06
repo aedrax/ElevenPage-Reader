@@ -127,9 +127,13 @@ describe('Storage Module - Property Tests', () => {
     });
 
     it('should round-trip arbitrary JSON-serializable values', async () => {
+      // Generate valid storage keys (non-empty after trimming)
+      const validKeyArbitrary = fc.string({ minLength: 1, maxLength: 50 })
+        .filter(s => s.trim().length > 0);
+
       await fc.assert(
         fc.asyncProperty(
-          fc.string({ minLength: 1, maxLength: 50 }),
+          validKeyArbitrary,
           fc.jsonValue(),
           async (key, value) => {
             // Store the value
