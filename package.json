@@ -1,0 +1,14 @@
+{
+  "name": "elevenpage-reader",
+  "version": "1.0.0",
+  "description": "Chrome Extension that converts web pages to audio using ElevenLabs AI voices",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "fast-check": "^3.15.0",
+    "vitest": "^1.6.0"
+  }
+}
