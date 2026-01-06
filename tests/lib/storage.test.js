@@ -60,8 +60,6 @@ describe('Storage Module - Property Tests', () => {
    * Property 1: Settings Persistence Round-Trip
    * For any valid settings value (API key, voice ID, or playback speed),
    * storing the value to Chrome storage and then retrieving it should return an equivalent value.
-   * 
-   * **Validates: Requirements 1.2, 2.3, 5.4**
    */
   describe('Property 1: Settings Persistence Round-Trip', () => {
     it('should round-trip string values (API keys, voice IDs)', async () => {
