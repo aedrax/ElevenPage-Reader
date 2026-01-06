@@ -14,7 +14,8 @@ const MessageType = {
   SET_API_KEY: 'setApiKey',
   SET_VOICE: 'setVoice',
   PLAYBACK_STATE_CHANGE: 'playbackStateChange',
-  SET_AUTO_CONTINUE: 'setAutoContinue'
+  SET_AUTO_CONTINUE: 'setAutoContinue',
+  SHOW_PLAYER: 'showPlayer'
 };
 
 /**
@@ -80,7 +81,8 @@ class PopupController {
       pauseIcon: document.querySelector('.pause-icon'),
       statusIndicator: document.querySelector('.status-indicator'),
       statusText: document.querySelector('.status-text'),
-      autoContinueCheckbox: document.getElementById('auto-continue-checkbox')
+      autoContinueCheckbox: document.getElementById('auto-continue-checkbox'),
+      showPlayerBtn: document.getElementById('show-player-btn')
     };
   }
 
@@ -107,6 +109,9 @@ class PopupController {
 
     // Auto-continue event
     this.elements.autoContinueCheckbox.addEventListener('change', () => this.toggleAutoContinue());
+
+    // Show player button
+    this.elements.showPlayerBtn.addEventListener('click', () => this.showPlayer());
   }
 
   /**
@@ -408,6 +413,21 @@ class PopupController {
       // Revert checkbox state on error
       this.elements.autoContinueCheckbox.checked = !autoContinue;
       this.showError('Error updating auto-continue setting');
+    }
+  }
+
+  /**
+   * Show the floating player on the current page
+   */
+  async showPlayer() {
+    try {
+      const response = await this.sendMessage(MessageType.SHOW_PLAYER, {});
+      
+      if (!response.success) {
+        this.showError(response.error || 'Could not show player on this page');
+      }
+    } catch (error) {
+      this.showError('Error showing player - make sure you are on a webpage');
     }
   }
 

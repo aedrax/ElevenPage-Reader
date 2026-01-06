@@ -15,7 +15,8 @@ const MessageType = {
   HIGHLIGHT_UPDATE: 'highlightUpdate',
   PLAYBACK_STATE_CHANGE: 'playbackStateChange',
   GET_NEXT_PARAGRAPH: 'getNextParagraph',
-  SET_TOTAL_PARAGRAPHS: 'setTotalParagraphs'
+  SET_TOTAL_PARAGRAPHS: 'setTotalParagraphs',
+  SHOW_PLAYER: 'showPlayer'
 };
 
 /**
@@ -829,6 +830,12 @@ function setupMessageListener() {
         case MessageType.GET_NEXT_PARAGRAPH:
           const response = handleGetNextParagraph(message);
           sendResponse(response);
+          break;
+        case MessageType.SHOW_PLAYER:
+          if (contentState.floatingPlayer) {
+            contentState.floatingPlayer.show();
+          }
+          sendResponse({ success: true });
           break;
         default:
           sendResponse({ received: true });

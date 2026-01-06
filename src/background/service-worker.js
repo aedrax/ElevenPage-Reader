@@ -25,6 +25,9 @@ const MessageType = {
   GET_NEXT_PARAGRAPH: 'getNextParagraph',
   SET_TOTAL_PARAGRAPHS: 'setTotalParagraphs',
   
+  // UI control
+  SHOW_PLAYER: 'showPlayer',
+  
   // Events to content script
   HIGHLIGHT_UPDATE: 'highlightUpdate',
   PLAYBACK_STATE_CHANGE: 'playbackStateChange'
@@ -581,6 +584,31 @@ async function handleSetTotalParagraphs(payload) {
 }
 
 /**
+ * Handle SHOW_PLAYER message
+ * Sends a message to the content script to show the floating player
+ * @param {number} tabId - Tab ID to show player in
+ * @returns {Promise<Object>}
+ */
+async function handleShowPlayer(tabId) {
+  if (!tabId) {
+    // Get the active tab if no tabId provided
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    tabId = tab?.id;
+  }
+  
+  if (!tabId) {
+    return { success: false, error: 'No active tab found' };
+  }
+  
+  try {
+    await chrome.tabs.sendMessage(tabId, { type: MessageType.SHOW_PLAYER });
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: 'Content script not loaded on this page' };
+  }
+}
+
+/**
  * Generate speech using ElevenLabs API
  * @param {string} apiKey - API key
  * @param {string} text - Text to convert
@@ -945,6 +973,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         
       case MessageType.SET_TOTAL_PARAGRAPHS:
         return handleSetTotalParagraphs(message.payload);
+        
+      case MessageType.SHOW_PLAYER:
+        return handleShowPlayer(sender.tab?.id);
         
       default:
         return { success: false, error: 'Unknown message type' };
