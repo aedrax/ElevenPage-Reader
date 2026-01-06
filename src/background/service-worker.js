@@ -126,6 +126,7 @@ async function updatePlaybackState(updates) {
 
 /**
  * Broadcast state change to all content scripts and popup
+ * This ensures state synchronization across all extension components
  */
 async function broadcastStateChange() {
   const message = {
@@ -133,7 +134,7 @@ async function broadcastStateChange() {
     state: getPlaybackState()
   };
   
-  // Broadcast to all tabs
+  // Broadcast to all tabs (content scripts)
   try {
     const tabs = await chrome.tabs.query({});
     for (const tab of tabs) {
@@ -144,8 +145,26 @@ async function broadcastStateChange() {
       }
     }
   } catch (e) {
-    console.error('Error broadcasting state:', e);
+    console.error('Error broadcasting state to tabs:', e);
   }
+  
+  // Broadcast to popup (if open) via runtime message
+  // The popup listens for runtime messages with PLAYBACK_STATE_CHANGE type
+  try {
+    await chrome.runtime.sendMessage(message);
+  } catch (e) {
+    // Popup may not be open, ignore
+    // This is expected when popup is closed
+  }
+}
+
+/**
+ * Get the current playback state for external queries
+ * Used by content scripts and popup to sync their state
+ * @returns {Object} Current playback state
+ */
+function getCurrentPlaybackState() {
+  return getPlaybackState();
 }
 
 
@@ -615,6 +634,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
  */
 chrome.tabs.onRemoved.addListener((tabId) => {
   if (tabId === audioContext.tabId) {
+    console.log('ElevenPage Reader: Active tab closed, stopping playback');
     handleStop();
   }
 });
@@ -624,8 +644,17 @@ chrome.tabs.onRemoved.addListener((tabId) => {
  */
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   if (tabId === audioContext.tabId && changeInfo.status === 'loading') {
+    console.log('ElevenPage Reader: Active tab navigating, stopping playback');
     handleStop();
   }
+});
+
+/**
+ * Handle tab activation changes - useful for future features
+ */
+chrome.tabs.onActivated.addListener((activeInfo) => {
+  // Currently we don't pause on tab switch, but this hook is available
+  // for future enhancements if needed
 });
 
 // Initialize state on service worker start
@@ -638,6 +667,8 @@ if (typeof module !== 'undefined' && module.exports) {
     PlaybackStatus,
     getPlaybackState,
     updatePlaybackState,
+    broadcastStateChange,
+    getCurrentPlaybackState,
     handlePlay,
     handlePause,
     handleStop,

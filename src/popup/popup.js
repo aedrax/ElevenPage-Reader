@@ -403,13 +403,20 @@ class PopupController {
 
   /**
    * Setup message listener for state changes
+   * Listens for PLAYBACK_STATE_CHANGE broadcasts from service worker
    */
   setupMessageListener() {
-    chrome.runtime.onMessage.addListener((message) => {
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       if (message.type === MessageType.PLAYBACK_STATE_CHANGE) {
         this.currentState = message.state;
         this.updateUI(message.state);
+        console.log('Popup: State synchronized -', message.state?.status);
       }
+      // Always send a response to avoid "message port closed" errors
+      if (sendResponse) {
+        sendResponse({ received: true });
+      }
+      return true;
     });
   }
 

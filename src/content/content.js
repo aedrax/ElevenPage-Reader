@@ -707,22 +707,37 @@ async function initialize() {
   }
 }
 
+/**
+ * Clean up all content script resources
+ * Called on page navigation or unload
+ */
 function cleanup() {
   console.log('ElevenPage Reader: Cleaning up content script');
+  
+  // Clear all highlights
   if (contentState.highlightManager) {
     contentState.highlightManager.clearHighlights();
     contentState.highlightManager = null;
   }
+  
+  // Remove paragraph buttons
   removeButtons();
+  
+  // Destroy floating player
   if (contentState.floatingPlayer) {
     contentState.floatingPlayer.destroy();
     contentState.floatingPlayer = null;
   }
+  
+  // Restore original page content
   if (contentState.parsedContent) {
     restoreAllContent(contentState.parsedContent);
     contentState.parsedContent = null;
   }
+  
+  // Reset state
   contentState.initialized = false;
+  contentState.currentPlaybackState = { status: PlaybackStatus.IDLE, speed: 1.0 };
 }
 
 
@@ -737,14 +752,24 @@ function handleHighlightUpdate(message) {
 function handlePlaybackStateChange(message) {
   const { state: playbackState } = message;
   if (!playbackState) return;
+  
+  // Update local state
   contentState.currentPlaybackState = playbackState;
+  
+  // Update floating player UI on state change
   if (contentState.floatingPlayer) {
     contentState.floatingPlayer.updatePlaybackState(playbackState);
-    if (playbackState.speed) contentState.floatingPlayer.updateSpeed(playbackState.speed);
+    if (playbackState.speed) {
+      contentState.floatingPlayer.updateSpeed(playbackState.speed);
+    }
   }
+  
+  // Clear highlights when playback stops
   if (playbackState.status === PlaybackStatus.IDLE && contentState.highlightManager) {
     contentState.highlightManager.clearHighlights();
   }
+  
+  console.log('ElevenPage Reader: State synchronized -', playbackState.status);
 }
 
 function setupMessageListener() {
@@ -770,12 +795,34 @@ function setupVisibilityListener() {
   });
 }
 
+/**
+ * Setup listener for page unload/navigation
+ * Stops playback and cleans up resources when user navigates away
+ */
 function setupUnloadListener() {
+  // Handle page unload (closing tab or navigating away)
   window.addEventListener('beforeunload', () => {
+    // Stop playback if currently playing or paused
+    if (contentState.currentPlaybackState.status !== PlaybackStatus.IDLE) {
+      // Use synchronous approach for beforeunload
+      try {
+        sendMessage({ type: MessageType.STOP });
+      } catch (e) {
+        // Ignore errors during unload
+      }
+    }
+    cleanup();
+  });
+  
+  // Handle page hide (for bfcache scenarios)
+  window.addEventListener('pagehide', (event) => {
     if (contentState.currentPlaybackState.status !== PlaybackStatus.IDLE) {
       sendMessage({ type: MessageType.STOP });
     }
-    cleanup();
+    // Only cleanup if page is not being cached
+    if (!event.persisted) {
+      cleanup();
+    }
   });
 }
 

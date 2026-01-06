@@ -9,6 +9,7 @@ import * as fc from 'fast-check';
 
 // Mock Chrome APIs
 const mockStorage = new Map();
+let broadcastedMessages = [];
 
 const chromeMock = {
   storage: {
@@ -36,16 +37,25 @@ const chromeMock = {
     onMessage: {
       addListener: vi.fn()
     },
-    sendMessage: vi.fn(),
+    sendMessage: vi.fn((message) => {
+      broadcastedMessages.push({ target: 'popup', ...message });
+      return Promise.resolve();
+    }),
     getContexts: vi.fn().mockResolvedValue([])
   },
   tabs: {
-    query: vi.fn().mockResolvedValue([]),
-    sendMessage: vi.fn(),
+    query: vi.fn().mockResolvedValue([{ id: 1 }, { id: 2 }]),
+    sendMessage: vi.fn((tabId, message) => {
+      broadcastedMessages.push({ target: `tab-${tabId}`, ...message });
+      return Promise.resolve();
+    }),
     onRemoved: {
       addListener: vi.fn()
     },
     onUpdated: {
+      addListener: vi.fn()
+    },
+    onActivated: {
       addListener: vi.fn()
     }
   },
@@ -64,6 +74,7 @@ const serviceWorkerModule = await import('../../src/background/service-worker.js
 describe('Service Worker Module - Property Tests', () => {
   beforeEach(() => {
     mockStorage.clear();
+    broadcastedMessages = [];
     chromeMock.runtime.lastError = null;
     vi.clearAllMocks();
   });
@@ -191,6 +202,161 @@ describe('Service Worker Module - Property Tests', () => {
         const state = serviceWorkerModule.getPlaybackState();
         expect(state.speed).toBe(speed);
       }
+    });
+  });
+
+  /**
+   * Property 9: State Synchronization Consistency
+   * For any playback state change event, querying the state from the service worker,
+   * content script, and popup (if open) should return equivalent playback state objects.
+   * 
+   * Feature: elevenlabs-reader, Property 9: State Synchronization Consistency
+   */
+  describe('Property 9: State Synchronization Consistency', () => {
+    
+    it('should broadcast consistent state to all listeners on any state change', async () => {
+      await fc.assert(
+        fc.asyncProperty(
+          // Generate random playback state updates
+          fc.record({
+            status: fc.constantFrom('idle', 'loading', 'playing', 'paused', 'error'),
+            currentParagraphIndex: fc.nat({ max: 100 }),
+            currentSentenceIndex: fc.nat({ max: 50 }),
+            currentWordIndex: fc.nat({ max: 200 }),
+            currentTime: fc.double({ min: 0, max: 3600, noNaN: true }),
+            speed: fc.double({ min: 0.5, max: 3.0, noNaN: true }),
+            error: fc.option(fc.string(), { nil: null })
+          }),
+          async (stateUpdate) => {
+            // Clear previous broadcasts
+            broadcastedMessages = [];
+            
+            // Update playback state
+            await serviceWorkerModule.updatePlaybackState(stateUpdate);
+            
+            // Get the current state from service worker
+            const serviceWorkerState = serviceWorkerModule.getPlaybackState();
+            
+            // Verify state was updated correctly
+            expect(serviceWorkerState.status).toBe(stateUpdate.status);
+            expect(serviceWorkerState.currentParagraphIndex).toBe(stateUpdate.currentParagraphIndex);
+            expect(serviceWorkerState.currentSentenceIndex).toBe(stateUpdate.currentSentenceIndex);
+            expect(serviceWorkerState.currentWordIndex).toBe(stateUpdate.currentWordIndex);
+            expect(serviceWorkerState.currentTime).toBe(stateUpdate.currentTime);
+            expect(serviceWorkerState.speed).toBe(stateUpdate.speed);
+            
+            // Verify broadcasts were sent
+            expect(broadcastedMessages.length).toBeGreaterThan(0);
+            
+            // All broadcasted messages should contain the same state
+            for (const broadcast of broadcastedMessages) {
+              if (broadcast.type === 'playbackStateChange' && broadcast.state) {
+                expect(broadcast.state.status).toBe(serviceWorkerState.status);
+                expect(broadcast.state.currentParagraphIndex).toBe(serviceWorkerState.currentParagraphIndex);
+                expect(broadcast.state.currentSentenceIndex).toBe(serviceWorkerState.currentSentenceIndex);
+                expect(broadcast.state.currentWordIndex).toBe(serviceWorkerState.currentWordIndex);
+                expect(broadcast.state.currentTime).toBe(serviceWorkerState.currentTime);
+                expect(broadcast.state.speed).toBe(serviceWorkerState.speed);
+              }
+            }
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it('should broadcast to all tabs and popup on state change', async () => {
+      await fc.assert(
+        fc.asyncProperty(
+          fc.constantFrom('idle', 'playing', 'paused'),
+          async (status) => {
+            // Clear previous broadcasts
+            broadcastedMessages = [];
+            
+            // Update state
+            await serviceWorkerModule.updatePlaybackState({ status });
+            
+            // Should have broadcasts to tabs (2 tabs in mock) and popup
+            const tabBroadcasts = broadcastedMessages.filter(m => m.target.startsWith('tab-'));
+            const popupBroadcasts = broadcastedMessages.filter(m => m.target === 'popup');
+            
+            // Should broadcast to all tabs
+            expect(tabBroadcasts.length).toBe(2);
+            
+            // Should attempt to broadcast to popup
+            expect(popupBroadcasts.length).toBe(1);
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it('should return consistent state via GET_STATE handler', async () => {
+      await fc.assert(
+        fc.asyncProperty(
+          fc.record({
+            status: fc.constantFrom('idle', 'loading', 'playing', 'paused', 'error'),
+            speed: fc.double({ min: 0.5, max: 3.0, noNaN: true }),
+            currentTime: fc.double({ min: 0, max: 3600, noNaN: true })
+          }),
+          async (stateUpdate) => {
+            // Update state
+            await serviceWorkerModule.updatePlaybackState(stateUpdate);
+            
+            // Query state via handler (simulates content script or popup query)
+            const response = serviceWorkerModule.handleGetState();
+            
+            // Response should be successful
+            expect(response.success).toBe(true);
+            expect(response.state).toBeDefined();
+            
+            // State should match what was set
+            expect(response.state.status).toBe(stateUpdate.status);
+            expect(response.state.speed).toBe(stateUpdate.speed);
+            expect(response.state.currentTime).toBe(stateUpdate.currentTime);
+            
+            // State should also match direct query
+            const directState = serviceWorkerModule.getPlaybackState();
+            expect(response.state.status).toBe(directState.status);
+            expect(response.state.speed).toBe(directState.speed);
+            expect(response.state.currentTime).toBe(directState.currentTime);
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it('should maintain state consistency across multiple rapid updates', async () => {
+      await fc.assert(
+        fc.asyncProperty(
+          fc.array(
+            fc.record({
+              status: fc.constantFrom('idle', 'playing', 'paused'),
+              speed: fc.double({ min: 0.5, max: 3.0, noNaN: true })
+            }),
+            { minLength: 1, maxLength: 10 }
+          ),
+          async (updates) => {
+            // Apply multiple rapid updates
+            for (const update of updates) {
+              await serviceWorkerModule.updatePlaybackState(update);
+            }
+            
+            // Final state should match last update
+            const lastUpdate = updates[updates.length - 1];
+            const finalState = serviceWorkerModule.getPlaybackState();
+            
+            expect(finalState.status).toBe(lastUpdate.status);
+            expect(finalState.speed).toBe(lastUpdate.speed);
+            
+            // GET_STATE should return same final state
+            const response = serviceWorkerModule.handleGetState();
+            expect(response.state.status).toBe(lastUpdate.status);
+            expect(response.state.speed).toBe(lastUpdate.speed);
+          }
+        ),
+        { numRuns: 100 }
+      );
     });
   });
 });
