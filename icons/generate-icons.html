@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Generate Extension Icons</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    canvas { border: 1px solid #ccc; margin: 10px; }
+    .icon-container { display: inline-block; text-align: center; margin: 20px; }
+    button { margin: 10px; padding: 10px 20px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>ElevenPage Reader Icon Generator</h1>
+  <p>Click each "Download" button to save the icon as PNG.</p>
+  
+  <div class="icon-container">
+    <h3>16x16</h3>
+    <canvas id="canvas16" width="16" height="16"></canvas>
+    <br>
+    <button onclick="download('canvas16', 'icon16.png')">Download 16x16</button>
+  </div>
+  
+  <div class="icon-container">
+    <h3>48x48</h3>
+    <canvas id="canvas48" width="48" height="48"></canvas>
+    <br>
+    <button onclick="download('canvas48', 'icon48.png')">Download 48x48</button>
+  </div>
+  
+  <div class="icon-container">
+    <h3>128x128</h3>
+    <canvas id="canvas128" width="128" height="128"></canvas>
+    <br>
+    <button onclick="download('canvas128', 'icon128.png')">Download 128x128</button>
+  </div>
+
+  <script>
+    function drawIcon(canvas) {
+      const ctx = canvas.getContext('2d');
+      const size = canvas.width;
+      const scale = size / 128;
+      
+      // Clear canvas
+      ctx.clearRect(0, 0, size, size);
+      
+      // Background circle
+      ctx.fillStyle = '#6366f1';
+      ctx.beginPath();
+      ctx.arc(64 * scale, 64 * scale, 60 * scale, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Speaker icon
+      ctx.fillStyle = 'white';
+      ctx.beginPath();
+      ctx.moveTo(40 * scale, 48 * scale);
+      ctx.lineTo(55 * scale, 48 * scale);
+      ctx.lineTo(70 * scale, 35 * scale);
+      ctx.lineTo(70 * scale, 93 * scale);
+      ctx.lineTo(55 * scale, 80 * scale);
+      ctx.lineTo(40 * scale, 80 * scale);
+      ctx.closePath();
+      ctx.fill();
+      
+      // Sound waves
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = 4 * scale;
+      ctx.lineCap = 'round';
+      
+      // First wave
+      ctx.beginPath();
+      ctx.moveTo(78 * scale, 50 * scale);
+      ctx.quadraticCurveTo(88 * scale, 64 * scale, 78 * scale, 78 * scale);
+      ctx.stroke();
+      
+      // Second wave
+      ctx.beginPath();
+      ctx.moveTo(85 * scale, 40 * scale);
+      ctx.quadraticCurveTo(100 * scale, 64 * scale, 85 * scale, 88 * scale);
+      ctx.stroke();
+      
+      // Text lines
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+      roundRect(ctx, 30 * scale, 98 * scale, 68 * scale, 4 * scale, 2 * scale);
+      
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+      roundRect(ctx, 38 * scale, 106 * scale, 52 * scale, 4 * scale, 2 * scale);
+    }
+    
+    function roundRect(ctx, x, y, width, height, radius) {
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.lineTo(x + width - radius, y);
+      ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+      ctx.lineTo(x + width, y + height - radius);
+      ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+      ctx.lineTo(x + radius, y + height);
+      ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+      ctx.lineTo(x, y + radius);
+      ctx.quadraticCurveTo(x, y, x + radius, y);
+      ctx.closePath();
+      ctx.fill();
+    }
+    
+    function download(canvasId, filename) {
+      const canvas = document.getElementById(canvasId);
+      const link = document.createElement('a');
+      link.download = filename;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+    
+    // Draw all icons on load
+    window.onload = function() {
+      drawIcon(document.getElementById('canvas16'));
+      drawIcon(document.getElementById('canvas48'));
+      drawIcon(document.getElementById('canvas128'));
+    };
+  </script>
+</body>
+</html>

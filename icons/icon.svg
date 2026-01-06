@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- Background circle -->
+  <circle cx="64" cy="64" r="60" fill="#6366f1"/>
+  
+  <!-- Speaker/audio icon -->
+  <path d="M40 48 L55 48 L70 35 L70 93 L55 80 L40 80 Z" fill="white"/>
+  
+  <!-- Sound waves -->
+  <path d="M78 50 Q88 64 78 78" stroke="white" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <path d="M85 40 Q100 64 85 88" stroke="white" stroke-width="4" fill="none" stroke-linecap="round"/>
+  
+  <!-- Text lines (representing reading) -->
+  <rect x="30" y="98" width="68" height="4" rx="2" fill="white" opacity="0.8"/>
+  <rect x="38" y="106" width="52" height="4" rx="2" fill="white" opacity="0.6"/>
+</svg>
