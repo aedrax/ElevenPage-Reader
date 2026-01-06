@@ -13,7 +13,8 @@ const MessageType = {
   GET_VOICES: 'getVoices',
   SET_API_KEY: 'setApiKey',
   SET_VOICE: 'setVoice',
-  PLAYBACK_STATE_CHANGE: 'playbackStateChange'
+  PLAYBACK_STATE_CHANGE: 'playbackStateChange',
+  SET_AUTO_CONTINUE: 'setAutoContinue'
 };
 
 /**
@@ -33,7 +34,8 @@ const PlaybackStatus = {
 const STORAGE_KEYS = {
   API_KEY: 'apiKey',
   SELECTED_VOICE_ID: 'selectedVoiceId',
-  PLAYBACK_SPEED: 'playbackSpeed'
+  PLAYBACK_SPEED: 'playbackSpeed',
+  AUTO_CONTINUE: 'autoContinue'
 };
 
 /**
@@ -77,7 +79,8 @@ class PopupController {
       playIcon: document.querySelector('.play-icon'),
       pauseIcon: document.querySelector('.pause-icon'),
       statusIndicator: document.querySelector('.status-indicator'),
-      statusText: document.querySelector('.status-text')
+      statusText: document.querySelector('.status-text'),
+      autoContinueCheckbox: document.getElementById('auto-continue-checkbox')
     };
   }
 
@@ -101,6 +104,9 @@ class PopupController {
     this.elements.playPauseBtn.addEventListener('click', () => this.togglePlayPause());
     this.elements.stopBtn.addEventListener('click', () => this.stop());
     this.elements.speedSelect.addEventListener('change', () => this.setSpeed());
+
+    // Auto-continue event
+    this.elements.autoContinueCheckbox.addEventListener('change', () => this.toggleAutoContinue());
   }
 
   /**
@@ -384,6 +390,27 @@ class PopupController {
     }
   }
 
+  /**
+   * Toggle auto-continue setting
+   */
+  async toggleAutoContinue() {
+    const autoContinue = this.elements.autoContinueCheckbox.checked;
+
+    try {
+      const response = await this.sendMessage(MessageType.SET_AUTO_CONTINUE, { autoContinue });
+      
+      if (!response.success) {
+        // Revert checkbox state on failure
+        this.elements.autoContinueCheckbox.checked = !autoContinue;
+        this.showError(response.error || 'Failed to update auto-continue setting');
+      }
+    } catch (error) {
+      // Revert checkbox state on error
+      this.elements.autoContinueCheckbox.checked = !autoContinue;
+      this.showError('Error updating auto-continue setting');
+    }
+  }
+
 
   /**
    * Sync state with service worker
@@ -451,6 +478,11 @@ class PopupController {
     // Update speed select
     if (state.speed) {
       this.elements.speedSelect.value = state.speed;
+    }
+
+    // Update auto-continue checkbox
+    if (state.autoContinue !== undefined) {
+      this.elements.autoContinueCheckbox.checked = state.autoContinue;
     }
 
     // Show/hide error

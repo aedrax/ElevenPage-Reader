@@ -19,6 +19,11 @@ const MessageType = {
   // Settings
   SET_API_KEY: 'setApiKey',
   SET_VOICE: 'setVoice',
+  SET_AUTO_CONTINUE: 'setAutoContinue',
+  
+  // Auto-continue
+  GET_NEXT_PARAGRAPH: 'getNextParagraph',
+  SET_TOTAL_PARAGRAPHS: 'setTotalParagraphs',
   
   // Events to content script
   HIGHLIGHT_UPDATE: 'highlightUpdate',
@@ -46,7 +51,9 @@ let playbackState = {
   currentWordIndex: 0,
   currentTime: 0,
   speed: 1.0,
-  error: null
+  error: null,
+  autoContinue: true,
+  totalParagraphs: 0
 };
 
 /**
@@ -68,7 +75,8 @@ const STORAGE_KEYS = {
   SELECTED_VOICE_ID: 'selectedVoiceId',
   PLAYBACK_SPEED: 'playbackSpeed',
   CACHED_VOICES: 'cachedVoices',
-  VOICES_CACHED_AT: 'voicesCachedAt'
+  VOICES_CACHED_AT: 'voicesCachedAt',
+  AUTO_CONTINUE: 'autoContinue'
 };
 
 /**
@@ -104,7 +112,12 @@ async function initializeState() {
   if (savedSpeed !== undefined && savedSpeed >= 0.5 && savedSpeed <= 3.0) {
     playbackState.speed = savedSpeed;
   }
-  console.log('ElevenPage Reader service worker initialized with speed:', playbackState.speed);
+  
+  const savedAutoContinue = await getFromStorage(STORAGE_KEYS.AUTO_CONTINUE);
+  // Default to true if not set
+  playbackState.autoContinue = savedAutoContinue !== undefined ? savedAutoContinue : true;
+  
+  console.log('ElevenPage Reader service worker initialized with speed:', playbackState.speed, 'autoContinue:', playbackState.autoContinue);
 }
 
 /**
@@ -396,6 +409,50 @@ async function handleSetVoice(payload) {
 }
 
 /**
+ * Handle SET_AUTO_CONTINUE message
+ * @param {Object} payload - Auto-continue payload
+ * @param {boolean} payload.autoContinue - The auto-continue setting
+ * @returns {Promise<Object>}
+ */
+async function handleSetAutoContinue(payload) {
+  const { autoContinue } = payload;
+  
+  // Validate that autoContinue is a boolean
+  if (typeof autoContinue !== 'boolean') {
+    return { success: false, error: 'Auto-continue must be a boolean' };
+  }
+  
+  // Save to storage
+  await saveToStorage(STORAGE_KEYS.AUTO_CONTINUE, autoContinue);
+  
+  // Update playback state and broadcast change
+  await updatePlaybackState({ autoContinue });
+  
+  return { success: true };
+}
+
+/**
+ * Handle SET_TOTAL_PARAGRAPHS message
+ * Updates the total paragraphs count for auto-continue boundary checking
+ * @param {Object} payload - Total paragraphs payload
+ * @param {number} payload.totalParagraphs - The total number of paragraphs on the page
+ * @returns {Promise<Object>}
+ */
+async function handleSetTotalParagraphs(payload) {
+  const { totalParagraphs } = payload;
+  
+  // Validate that totalParagraphs is a non-negative number
+  if (typeof totalParagraphs !== 'number' || totalParagraphs < 0) {
+    return { success: false, error: 'Total paragraphs must be a non-negative number' };
+  }
+  
+  // Update playback state (no need to broadcast for this internal state)
+  playbackState.totalParagraphs = totalParagraphs;
+  
+  return { success: true };
+}
+
+/**
  * Generate speech using ElevenLabs API
  * @param {string} apiKey - API key
  * @param {string} text - Text to convert
@@ -544,6 +601,67 @@ async function sendToOffscreen(message) {
 }
 
 /**
+ * Request next paragraph text from content script and initiate playback
+ * @param {number} paragraphIndex - Index of the paragraph to request
+ * @returns {Promise<void>}
+ */
+async function requestNextParagraph(paragraphIndex) {
+  if (!audioContext.tabId) {
+    await handleStop();
+    return;
+  }
+  
+  const message = {
+    type: MessageType.GET_NEXT_PARAGRAPH,
+    paragraphIndex
+  };
+  
+  try {
+    const response = await chrome.tabs.sendMessage(audioContext.tabId, message);
+    
+    if (response && response.success && response.text) {
+      // Initiate playback of the next paragraph
+      await handlePlay({
+        tabId: audioContext.tabId,
+        text: response.text,
+        paragraphIndex: response.paragraphIndex
+      });
+    } else {
+      // No more paragraphs or error - stop playback
+      await handleStop();
+    }
+  } catch (error) {
+    // Content script not responding or tab closed - stop playback
+    console.error('Error requesting next paragraph:', error);
+    await handleStop();
+  }
+}
+
+/**
+ * Handle audio playback ended event
+ * Implements auto-continue logic to play next paragraph if enabled
+ * @returns {Promise<void>}
+ */
+async function handleAudioEnded() {
+  const { autoContinue, currentParagraphIndex, totalParagraphs } = playbackState;
+  
+  // First, clean up the current audio state
+  audioContext.audioData = null;
+  audioContext.alignmentData = null;
+  
+  // Check if auto-continue is enabled and there's a next paragraph
+  if (autoContinue && currentParagraphIndex < totalParagraphs - 1) {
+    // Set status to loading before requesting next paragraph
+    await updatePlaybackState({ status: PlaybackStatus.LOADING });
+    // Request next paragraph from content script
+    await requestNextParagraph(currentParagraphIndex + 1);
+  } else {
+    // Stop playback - either auto-continue is disabled or we're at the last paragraph
+    await handleStop();
+  }
+}
+
+/**
  * Handle messages from offscreen document
  * @param {Object} message - Message from offscreen
  */
@@ -558,8 +676,8 @@ async function handleOffscreenMessage(message) {
       break;
       
     case 'ended':
-      // Audio playback completed
-      await handleStop();
+      // Audio playback completed - check for auto-continue
+      await handleAudioEnded();
       break;
       
     case 'error':
@@ -632,6 +750,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       case MessageType.SET_VOICE:
         return handleSetVoice(message.payload);
         
+      case MessageType.SET_AUTO_CONTINUE:
+        return handleSetAutoContinue(message.payload);
+        
+      case MessageType.SET_TOTAL_PARAGRAPHS:
+        return handleSetTotalParagraphs(message.payload);
+        
       default:
         return { success: false, error: 'Unknown message type' };
     }
@@ -685,6 +809,10 @@ if (typeof module !== 'undefined' && module.exports) {
     handlePause,
     handleStop,
     handleSetSpeed,
-    handleGetState
+    handleGetState,
+    handleSetAutoContinue,
+    handleSetTotalParagraphs,
+    handleAudioEnded,
+    requestNextParagraph
   };
 }

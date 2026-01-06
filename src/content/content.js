@@ -13,7 +13,9 @@ const MessageType = {
   JUMP_TO_PARAGRAPH: 'jumpToParagraph',
   GET_STATE: 'getState',
   HIGHLIGHT_UPDATE: 'highlightUpdate',
-  PLAYBACK_STATE_CHANGE: 'playbackStateChange'
+  PLAYBACK_STATE_CHANGE: 'playbackStateChange',
+  GET_NEXT_PARAGRAPH: 'getNextParagraph',
+  SET_TOTAL_PARAGRAPHS: 'setTotalParagraphs'
 };
 
 /**
@@ -682,6 +684,13 @@ async function initialize() {
     }
     console.log(`ElevenPage Reader: Found ${contentState.parsedContent.paragraphs.length} paragraphs`);
     
+    // Send total paragraphs count to service worker for auto-continue boundary checking
+    const totalParagraphs = contentState.parsedContent.paragraphs.length;
+    await sendMessage({ 
+      type: MessageType.SET_TOTAL_PARAGRAPHS, 
+      payload: { totalParagraphs } 
+    });
+    
     for (let i = 0; i < contentState.parsedContent.paragraphs.length; i++) {
       const paragraph = contentState.parsedContent.paragraphs[i];
       wrapWordsInSpans(paragraph.element, i, paragraph.sentences);
@@ -749,6 +758,39 @@ function handleHighlightUpdate(message) {
   }
 }
 
+/**
+ * Handle GET_NEXT_PARAGRAPH message from service worker
+ * Returns the text content and index of the requested paragraph
+ * @param {Object} message - Message containing paragraphIndex
+ * @returns {Object} Response with success, text, paragraphIndex, or error
+ */
+function handleGetNextParagraph(message) {
+  const { paragraphIndex } = message;
+  
+  // Validate that we have parsed content
+  if (!contentState.parsedContent || !contentState.parsedContent.paragraphs) {
+    return { success: false, error: 'No parsed content available' };
+  }
+  
+  const paragraphs = contentState.parsedContent.paragraphs;
+  
+  // Validate paragraph index
+  if (typeof paragraphIndex !== 'number' || paragraphIndex < 0 || paragraphIndex >= paragraphs.length) {
+    return { success: false, error: 'Invalid paragraph index' };
+  }
+  
+  const paragraph = paragraphs[paragraphIndex];
+  
+  // Extract text from paragraph sentences
+  const text = paragraph.sentences.map(s => s.text).join(' ');
+  
+  if (!text || text.trim().length === 0) {
+    return { success: false, error: 'Paragraph has no text content' };
+  }
+  
+  return { success: true, text, paragraphIndex };
+}
+
 function handlePlaybackStateChange(message) {
   const { state: playbackState } = message;
   if (!playbackState) return;
@@ -778,12 +820,19 @@ function setupMessageListener() {
       switch (message.type) {
         case MessageType.HIGHLIGHT_UPDATE:
           handleHighlightUpdate(message);
+          sendResponse({ received: true });
           break;
         case MessageType.PLAYBACK_STATE_CHANGE:
           handlePlaybackStateChange(message);
+          sendResponse({ received: true });
           break;
+        case MessageType.GET_NEXT_PARAGRAPH:
+          const response = handleGetNextParagraph(message);
+          sendResponse(response);
+          break;
+        default:
+          sendResponse({ received: true });
       }
-      sendResponse({ received: true });
       return true;
     });
   }

@@ -10,6 +10,7 @@ const MessageType = {
   STOP: 'stop',
   SET_SPEED: 'setSpeed',
   GET_STATE: 'getState',
+  SET_AUTO_CONTINUE: 'setAutoContinue',
   PLAYBACK_STATE_CHANGE: 'playbackStateChange'
 };
 
@@ -37,6 +38,7 @@ class FloatingPlayer {
     this.container = null;
     this.playPauseButton = null;
     this.stopButton = null;
+    this.autoContinueButton = null;
     this.speedSelect = null;
     this.statusText = null;
     this.isDragging = false;
@@ -44,7 +46,8 @@ class FloatingPlayer {
     this.position = { x: 20, y: 20 };
     this.currentState = {
       status: PlaybackStatus.IDLE,
-      speed: 1.0
+      speed: 1.0,
+      autoContinue: true
     };
     
     // Bind methods
@@ -54,6 +57,7 @@ class FloatingPlayer {
     this.onPlayPauseClick = this.onPlayPauseClick.bind(this);
     this.onStopClick = this.onStopClick.bind(this);
     this.onSpeedChange = this.onSpeedChange.bind(this);
+    this.onAutoContinueClick = this.onAutoContinueClick.bind(this);
   }
 
   /**
@@ -102,6 +106,14 @@ class FloatingPlayer {
     this.stopButton.title = 'Stop';
     this.stopButton.addEventListener('click', this.onStopClick);
     controls.appendChild(this.stopButton);
+    
+    // Auto-continue button
+    this.autoContinueButton = document.createElement('button');
+    this.autoContinueButton.className = 'elevenlabs-fp-btn elevenlabs-fp-auto-continue';
+    this.autoContinueButton.innerHTML = this.getAutoContinueIcon(true);
+    this.autoContinueButton.title = 'Auto-continue: On';
+    this.autoContinueButton.addEventListener('click', this.onAutoContinueClick);
+    controls.appendChild(this.autoContinueButton);
     
     // Speed control
     const speedContainer = document.createElement('div');
@@ -171,6 +183,18 @@ class FloatingPlayer {
   }
 
   /**
+   * Get SVG icon for auto-continue button
+   * @param {boolean} enabled - Whether auto-continue is enabled
+   * @returns {string}
+   */
+  getAutoContinueIcon(enabled) {
+    const color = enabled ? 'currentColor' : '#888';
+    return `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
+      <path d="M11 4v1.5l3-2.5-3-2.5V2H5C3.35 2 2 3.35 2 5v2h1.5V5c0-.83.67-1.5 1.5-1.5h6zm-6 8v-1.5l-3 2.5 3 2.5V14h6c1.65 0 3-1.35 3-3v-2h-1.5v2c0 .83-.67 1.5-1.5 1.5H5z"/>
+    </svg>`;
+  }
+
+  /**
    * Show the floating player
    */
   show() {
@@ -214,6 +238,7 @@ class FloatingPlayer {
       this.container = null;
       this.playPauseButton = null;
       this.stopButton = null;
+      this.autoContinueButton = null;
       this.speedSelect = null;
       this.statusText = null;
     }
@@ -339,6 +364,30 @@ class FloatingPlayer {
   }
 
   /**
+   * Handle auto-continue button click
+   */
+  async onAutoContinueClick() {
+    const newValue = !this.currentState.autoContinue;
+    await this.sendMessage({
+      type: MessageType.SET_AUTO_CONTINUE,
+      payload: { autoContinue: newValue }
+    });
+  }
+
+  /**
+   * Update the auto-continue button state
+   * @param {boolean} enabled - Whether auto-continue is enabled
+   */
+  updateAutoContinue(enabled) {
+    this.currentState.autoContinue = enabled;
+    if (this.autoContinueButton) {
+      this.autoContinueButton.innerHTML = this.getAutoContinueIcon(enabled);
+      this.autoContinueButton.title = `Auto-continue: ${enabled ? 'On' : 'Off'}`;
+      this.autoContinueButton.classList.toggle('elevenlabs-fp-auto-continue-disabled', !enabled);
+    }
+  }
+
+  /**
    * Send message to service worker
    * @param {Object} message
    * @returns {Promise<Object>}
@@ -390,6 +439,11 @@ class FloatingPlayer {
     // Update stop button
     if (this.stopButton) {
       this.stopButton.disabled = state.status === PlaybackStatus.IDLE;
+    }
+    
+    // Update auto-continue button
+    if (state.autoContinue !== undefined) {
+      this.updateAutoContinue(state.autoContinue);
     }
     
     // Update status text

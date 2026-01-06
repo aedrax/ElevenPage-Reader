@@ -47,7 +47,7 @@ const chromeMock = {
 globalThis.chrome = chromeMock;
 
 // Import storage module after setting up mock
-const { saveSettings, getSettings, getAllSettings, clearAllSettings, STORAGE_KEYS } = await import('../../lib/storage.js');
+const { saveSettings, getSettings, getAllSettings, clearAllSettings, STORAGE_KEYS, DEFAULTS } = await import('../../lib/storage.js');
 
 describe('Storage Module - Property Tests', () => {
   beforeEach(() => {
@@ -168,6 +168,65 @@ describe('Storage Module - Property Tests', () => {
             // Each should be independently correct
             expect(all[STORAGE_KEYS.API_KEY]).toBe(apiKey);
             expect(all[STORAGE_KEYS.SELECTED_VOICE_ID]).toBe(voiceId);
+            expect(all[STORAGE_KEYS.PLAYBACK_SPEED]).toBe(speed);
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+  });
+
+  /**
+   * Feature: auto-continue-playback, Property 1: Auto-Continue Settings Round-Trip
+   * For any boolean value (true or false), storing the auto-continue setting to Chrome storage
+   * and then retrieving it should return the same boolean value.
+   */
+  describe('Feature: auto-continue-playback, Property 1: Auto-Continue Settings Round-Trip', () => {
+    it('should have AUTO_CONTINUE key defined in STORAGE_KEYS', () => {
+      expect(STORAGE_KEYS.AUTO_CONTINUE).toBe('autoContinue');
+    });
+
+    it('should have default value of true for AUTO_CONTINUE', () => {
+      expect(DEFAULTS[STORAGE_KEYS.AUTO_CONTINUE]).toBe(true);
+    });
+
+    it('should round-trip boolean values for auto-continue setting', async () => {
+      await fc.assert(
+        fc.asyncProperty(
+          fc.boolean(),
+          async (autoContinue) => {
+            // Store the auto-continue value
+            await saveSettings(STORAGE_KEYS.AUTO_CONTINUE, autoContinue);
+            
+            // Retrieve the value
+            const retrieved = await getSettings(STORAGE_KEYS.AUTO_CONTINUE);
+            
+            // Should be equivalent
+            expect(retrieved).toBe(autoContinue);
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it('should persist auto-continue independently from other settings', async () => {
+      await fc.assert(
+        fc.asyncProperty(
+          fc.boolean(),
+          fc.string({ minLength: 1, maxLength: 100 }),
+          fc.double({ min: 0.5, max: 3.0, noNaN: true }),
+          async (autoContinue, apiKey, speed) => {
+            // Store multiple values including auto-continue
+            await saveSettings(STORAGE_KEYS.AUTO_CONTINUE, autoContinue);
+            await saveSettings(STORAGE_KEYS.API_KEY, apiKey);
+            await saveSettings(STORAGE_KEYS.PLAYBACK_SPEED, speed);
+            
+            // Retrieve all settings
+            const all = await getAllSettings();
+            
+            // Each should be independently correct
+            expect(all[STORAGE_KEYS.AUTO_CONTINUE]).toBe(autoContinue);
+            expect(all[STORAGE_KEYS.API_KEY]).toBe(apiKey);
             expect(all[STORAGE_KEYS.PLAYBACK_SPEED]).toBe(speed);
           }
         ),

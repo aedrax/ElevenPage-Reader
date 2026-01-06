@@ -109,6 +109,32 @@
   transform: scale(0.95);
 }
 
+/* Auto-continue button */
+.elevenlabs-fp-auto-continue {
+  background: #ecfdf5;
+  color: #10b981;
+}
+
+.elevenlabs-fp-auto-continue:hover:not(:disabled) {
+  background: #d1fae5;
+  color: #059669;
+}
+
+.elevenlabs-fp-auto-continue:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+/* Auto-continue disabled state */
+.elevenlabs-fp-auto-continue-disabled {
+  background: #f3f4f6;
+  color: #9ca3af;
+}
+
+.elevenlabs-fp-auto-continue-disabled:hover:not(:disabled) {
+  background: #e5e7eb;
+  color: #6b7280;
+}
+
 
 /* Speed control container */
 .elevenlabs-fp-speed-container {
@@ -207,6 +233,26 @@
   .elevenlabs-fp-stop:hover:not(:disabled) {
     background: #4b5563;
     color: #d1d5db;
+  }
+
+  .elevenlabs-fp-auto-continue {
+    background: #064e3b;
+    color: #34d399;
+  }
+
+  .elevenlabs-fp-auto-continue:hover:not(:disabled) {
+    background: #065f46;
+    color: #6ee7b7;
+  }
+
+  .elevenlabs-fp-auto-continue-disabled {
+    background: #374151;
+    color: #6b7280;
+  }
+
+  .elevenlabs-fp-auto-continue-disabled:hover:not(:disabled) {
+    background: #4b5563;
+    color: #9ca3af;
   }
 
   .elevenlabs-fp-speed-label {

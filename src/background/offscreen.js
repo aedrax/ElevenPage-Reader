@@ -36,8 +36,10 @@ function base64ToArrayBuffer(base64) {
  * @returns {HTMLAudioElement}
  */
 function createAudioElement(audioData) {
-  // Clean up existing audio
+  // Clean up existing audio - remove listeners first to prevent error events
   if (audioElement) {
+    audioElement.removeEventListener('ended', handleEnded);
+    audioElement.removeEventListener('error', handleError);
     audioElement.pause();
     audioElement.src = '';
     audioElement = null;
@@ -173,6 +175,9 @@ function handleStop() {
   stopTimeUpdates();
   
   if (audioElement) {
+    // Remove listeners first to prevent error events during cleanup
+    audioElement.removeEventListener('ended', handleEnded);
+    audioElement.removeEventListener('error', handleError);
     audioElement.pause();
     audioElement.currentTime = 0;
     audioElement.src = '';
