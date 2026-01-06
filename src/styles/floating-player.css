@@ -1,5 +1,252 @@
 /* ElevenPage Reader - Floating Player Styles */
 
 .elevenlabs-floating-player {
-  /* Floating player styling will be defined here */
+  position: fixed;
+  z-index: 2147483647;
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15), 0 2px 6px rgba(0, 0, 0, 0.1);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  font-size: 14px;
+  min-width: 220px;
+  max-width: 280px;
+  user-select: none;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+/* Header with drag handle */
+.elevenlabs-fp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  border-radius: 7px 7px 0 0;
+  cursor: move;
+}
+
+.elevenlabs-fp-title {
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.3px;
+}
+
+.elevenlabs-fp-close {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+  transition: color 0.15s ease;
+}
+
+.elevenlabs-fp-close:hover {
+  color: #ffffff;
+}
+
+/* Controls container */
+.elevenlabs-fp-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+/* Control buttons */
+.elevenlabs-fp-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.elevenlabs-fp-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.elevenlabs-fp-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Play/Pause button */
+.elevenlabs-fp-play-pause {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: #ffffff;
+}
+
+.elevenlabs-fp-play-pause:hover:not(:disabled) {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  transform: scale(1.05);
+}
+
+.elevenlabs-fp-play-pause:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+/* Stop button */
+.elevenlabs-fp-stop {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.elevenlabs-fp-stop:hover:not(:disabled) {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.elevenlabs-fp-stop:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+
+/* Speed control container */
+.elevenlabs-fp-speed-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.elevenlabs-fp-speed-label {
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.elevenlabs-fp-speed-select {
+  padding: 4px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #374151;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.elevenlabs-fp-speed-select:hover {
+  border-color: #9ca3af;
+}
+
+.elevenlabs-fp-speed-select:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
+/* Status text */
+.elevenlabs-fp-status {
+  padding: 8px 12px;
+  color: #6b7280;
+  font-size: 12px;
+  text-align: center;
+  background: #f9fafb;
+  border-radius: 0 0 7px 7px;
+}
+
+/* Loading state animation */
+.elevenlabs-floating-player[data-status="loading"] .elevenlabs-fp-status {
+  color: #6366f1;
+}
+
+.elevenlabs-floating-player[data-status="loading"] .elevenlabs-fp-status::after {
+  content: '';
+  animation: elevenlabs-dots 1.5s infinite;
+}
+
+@keyframes elevenlabs-dots {
+  0%, 20% { content: ''; }
+  40% { content: '.'; }
+  60% { content: '..'; }
+  80%, 100% { content: '...'; }
+}
+
+/* Playing state */
+.elevenlabs-floating-player[data-status="playing"] .elevenlabs-fp-status {
+  color: #10b981;
+}
+
+/* Paused state */
+.elevenlabs-floating-player[data-status="paused"] .elevenlabs-fp-status {
+  color: #f59e0b;
+}
+
+/* Error state */
+.elevenlabs-floating-player[data-status="error"] .elevenlabs-fp-status {
+  color: #ef4444;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .elevenlabs-floating-player {
+    background: #1f2937;
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .elevenlabs-fp-controls {
+    border-bottom-color: #374151;
+  }
+
+  .elevenlabs-fp-stop {
+    background: #374151;
+    color: #9ca3af;
+  }
+
+  .elevenlabs-fp-stop:hover:not(:disabled) {
+    background: #4b5563;
+    color: #d1d5db;
+  }
+
+  .elevenlabs-fp-speed-label {
+    color: #9ca3af;
+  }
+
+  .elevenlabs-fp-speed-select {
+    background: #374151;
+    border-color: #4b5563;
+    color: #e5e7eb;
+  }
+
+  .elevenlabs-fp-speed-select:hover {
+    border-color: #6b7280;
+  }
+
+  .elevenlabs-fp-status {
+    background: #111827;
+    color: #9ca3af;
+  }
+}
+
+/* Responsive adjustments for smaller viewports */
+@media (max-width: 400px) {
+  .elevenlabs-floating-player {
+    min-width: 180px;
+    max-width: 220px;
+  }
+
+  .elevenlabs-fp-controls {
+    padding: 8px;
+    gap: 6px;
+  }
+
+  .elevenlabs-fp-btn {
+    width: 32px;
+    height: 32px;
+  }
+
+  .elevenlabs-fp-speed-label {
+    display: none;
+  }
 }
