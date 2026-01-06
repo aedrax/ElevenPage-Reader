@@ -419,14 +419,9 @@ async function generateSpeech(apiKey, text, voiceId) {
   );
   
   if (!response.ok) {
-    const errorText = await response.text();
-    if (response.status === 401) {
-      throw new Error('Invalid API key');
-    }
-    if (response.status === 429) {
-      throw new Error('Rate limit exceeded');
-    }
-    throw new Error(`API error: ${response.status}`);
+    const errorData = await response.json().catch(() => ({}));
+    const errorMessage = errorData.detail?.message || errorData.detail?.status || `API error: ${response.status}`;
+    throw new Error(errorMessage);
   }
   
   const data = await response.json();
@@ -463,10 +458,9 @@ async function fetchVoices(apiKey) {
   });
   
   if (!response.ok) {
-    if (response.status === 401) {
-      throw new Error('Invalid API key');
-    }
-    throw new Error(`API error: ${response.status}`);
+    const errorData = await response.json().catch(() => ({}));
+    const errorMessage = errorData.detail?.message || errorData.detail?.status || `API error: ${response.status}`;
+    throw new Error(errorMessage);
   }
   
   const data = await response.json();
