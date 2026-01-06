@@ -81,7 +81,31 @@ function shouldExcludeElement(element) {
 
 function getTextContent(element) {
   if (!element) return '';
-  return (element.textContent || '').replace(/\s+/g, ' ').trim();
+  
+  // Clone the element to avoid modifying the original DOM
+  const clone = element.cloneNode(true);
+  
+  // Remove elements that should not be read aloud:
+  // - aria-hidden="true" (KaTeX math visual duplicates, icons, etc.)
+  // - .cdk-visually-hidden (Angular CDK screen reader only text)
+  // - .sr-only, .visually-hidden (common screen reader only classes)
+  // - sup.superscript (footnote markers in Gemini)
+  const hiddenSelectors = [
+    '[aria-hidden="true"]',
+    '.cdk-visually-hidden',
+    '.sr-only',
+    '.visually-hidden',
+    'sup.superscript'
+  ];
+  
+  for (const selector of hiddenSelectors) {
+    const hiddenElements = clone.querySelectorAll(selector);
+    for (const hidden of hiddenElements) {
+      hidden.remove();
+    }
+  }
+  
+  return (clone.textContent || '').replace(/\s+/g, ' ').trim();
 }
 
 function parseSentences(text) {
@@ -671,6 +695,55 @@ async function sendMessage(message) {
   });
 }
 
+/**
+ * Wait for content to be available on dynamically-rendered pages (SPAs like Angular, React)
+ * Retries parsing with exponential backoff, or uses MutationObserver as fallback
+ */
+async function waitForContent(maxAttempts = 5, initialDelay = 500) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const parsed = parsePageContent(document);
+    if (parsed && parsed.paragraphs.length > 0) {
+      console.log(`ElevenPage Reader: Found content on attempt ${attempt}`);
+      return parsed;
+    }
+    
+    if (attempt < maxAttempts) {
+      const delay = initialDelay * attempt;
+      console.log(`ElevenPage Reader: No content found, retrying in ${delay}ms (attempt ${attempt}/${maxAttempts})`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  
+  // Final fallback: wait for DOM mutations that might indicate content loading
+  return new Promise((resolve) => {
+    console.log('ElevenPage Reader: Using MutationObserver to wait for content...');
+    let resolved = false;
+    
+    const observer = new MutationObserver(() => {
+      if (resolved) return;
+      const parsed = parsePageContent(document);
+      if (parsed && parsed.paragraphs.length > 0) {
+        resolved = true;
+        observer.disconnect();
+        console.log('ElevenPage Reader: Found content via MutationObserver');
+        resolve(parsed);
+      }
+    });
+    
+    observer.observe(document.body, { childList: true, subtree: true });
+    
+    // Timeout after 10 seconds
+    setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        observer.disconnect();
+        console.log('ElevenPage Reader: Timeout waiting for content');
+        resolve(null);
+      }
+    }, 10000);
+  });
+}
+
 async function initialize() {
   if (contentState.initialized) {
     console.log('ElevenPage Reader: Already initialized');
@@ -678,7 +751,7 @@ async function initialize() {
   }
   console.log('ElevenPage Reader: Initializing content script');
   try {
-    contentState.parsedContent = parsePageContent(document);
+    contentState.parsedContent = await waitForContent();
     if (!contentState.parsedContent || contentState.parsedContent.paragraphs.length === 0) {
       console.log('ElevenPage Reader: No readable content found on page');
       return;

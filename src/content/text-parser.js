@@ -154,6 +154,7 @@ function shouldExcludeElement(element) {
 
 /**
  * Gets the text content of an element, normalized
+ * Filters out aria-hidden elements (like KaTeX math duplicates) and visually hidden elements
  * @param {HTMLElement} element - Element to get text from
  * @returns {string} Normalized text content
  */
@@ -162,7 +163,29 @@ function getTextContent(element) {
     return '';
   }
   
-  const text = element.textContent || '';
+  // Clone the element to avoid modifying the original DOM
+  const clone = element.cloneNode(true);
+  
+  // Remove elements that should not be read aloud:
+  // - aria-hidden="true" (KaTeX math visual duplicates, icons, etc.)
+  // - .cdk-visually-hidden (Angular CDK screen reader only text)
+  // - .sr-only, .visually-hidden (common screen reader only classes)
+  const hiddenSelectors = [
+    '[aria-hidden="true"]',
+    '.cdk-visually-hidden',
+    '.sr-only',
+    '.visually-hidden',
+    'sup.superscript' // Footnote markers in Gemini
+  ];
+  
+  for (const selector of hiddenSelectors) {
+    const hiddenElements = clone.querySelectorAll(selector);
+    for (const hidden of hiddenElements) {
+      hidden.remove();
+    }
+  }
+  
+  const text = clone.textContent || '';
   // Normalize whitespace
   return text.replace(/\s+/g, ' ').trim();
 }
