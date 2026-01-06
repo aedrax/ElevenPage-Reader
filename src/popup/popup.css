@@ -1,21 +1,264 @@
 /* ElevenPage Reader - Popup Styles */
 
+* {
+  box-sizing: border-box;
+}
+
 body {
   width: 320px;
   min-height: 200px;
   margin: 0;
-  padding: 16px;
+  padding: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  color: #333;
+  background: #fff;
 }
 
 #popup-container {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  padding: 16px;
 }
 
-h1 {
+/* Header */
+.popup-header {
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.popup-header h1 {
   font-size: 18px;
-  margin: 0 0 8px 0;
+  font-weight: 600;
+  margin: 0;
+  color: #1a1a1a;
+}
+
+/* Sections */
+.section {
+  margin-bottom: 16px;
+}
+
+.section label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: #666;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Input Groups */
+.input-group {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.input-group input,
+.input-group select {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.input-group input:focus,
+.input-group select:focus {
+  outline: none;
+  border-color: #4a90d9;
+  box-shadow: 0 0 0 3px rgba(74, 144, 217, 0.1);
+}
+
+.input-group input::placeholder {
+  color: #aaa;
+}
+
+
+/* Buttons */
+.btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s, opacity 0.2s;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: #4a90d9;
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #3a7bc8;
+}
+
+.btn-control {
+  background: #f5f5f5;
   color: #333;
+  min-width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+.btn-control:hover:not(:disabled) {
+  background: #e8e8e8;
+}
+
+.icon-btn {
+  background: transparent;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.icon-btn:hover {
+  background: #f5f5f5;
+}
+
+/* Voice Section */
+.voice-section select {
+  width: 100%;
+}
+
+.voice-section select:disabled {
+  background: #f9f9f9;
+  color: #999;
+}
+
+/* Playback Controls */
+.playback-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.speed-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.speed-control label {
+  font-size: 12px;
+  color: #666;
+  margin: 0;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.speed-control select {
+  padding: 6px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 13px;
+  background: white;
+}
+
+/* Status Messages */
+.status-message {
+  font-size: 12px;
+  margin-top: 6px;
+  padding: 4px 0;
+  display: none;
+}
+
+.status-message.success {
+  color: #2e7d32;
+}
+
+.status-message.error {
+  color: #c62828;
+}
+
+.status-message.info {
+  color: #1565c0;
+}
+
+/* Playback Status */
+.playback-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #f8f9fa;
+  border-radius: 6px;
+}
+
+.status-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #9e9e9e;
+}
+
+.status-indicator.idle {
+  background: #9e9e9e;
+}
+
+.status-indicator.loading {
+  background: #ff9800;
+  animation: pulse 1s infinite;
+}
+
+.status-indicator.playing {
+  background: #4caf50;
+  animation: pulse 1s infinite;
+}
+
+.status-indicator.paused {
+  background: #2196f3;
+}
+
+.status-indicator.error {
+  background: #f44336;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.status-text {
+  font-size: 13px;
+  color: #555;
+}
+
+/* Error Display */
+.error-display {
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: #ffebee;
+  border: 1px solid #ffcdd2;
+  border-radius: 6px;
+  color: #c62828;
+  font-size: 13px;
+}
+
+/* Play/Pause Icons */
+.play-icon,
+.pause-icon {
+  line-height: 1;
 }

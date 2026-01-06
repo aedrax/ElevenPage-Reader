@@ -8,8 +8,76 @@
 </head>
 <body>
   <div id="popup-container">
-    <h1>ElevenPage Reader</h1>
-    <!-- Settings and controls will be added here -->
+    <header class="popup-header">
+      <h1>ElevenPage Reader</h1>
+    </header>
+
+    <!-- API Key Section -->
+    <section class="section api-key-section">
+      <label for="api-key-input">ElevenLabs API Key</label>
+      <div class="input-group">
+        <input 
+          type="password" 
+          id="api-key-input" 
+          placeholder="Enter your API key"
+          autocomplete="off"
+        >
+        <button id="toggle-key-visibility" class="icon-btn" title="Show/Hide API key">
+          👁
+        </button>
+        <button id="save-api-key" class="btn btn-primary">Save</button>
+      </div>
+      <div id="api-key-status" class="status-message"></div>
+    </section>
+
+    <!-- Voice Selection Section -->
+    <section class="section voice-section">
+      <label for="voice-select">Voice</label>
+      <div class="input-group">
+        <select id="voice-select" disabled>
+          <option value="">Select a voice...</option>
+        </select>
+        <button id="refresh-voices" class="icon-btn" title="Refresh voices">
+          🔄
+        </button>
+      </div>
+      <div id="voice-status" class="status-message"></div>
+    </section>
+
+    <!-- Playback Controls Section -->
+    <section class="section playback-section">
+      <label>Playback Controls</label>
+      <div class="playback-controls">
+        <button id="play-pause-btn" class="btn btn-control" disabled>
+          <span class="play-icon">▶</span>
+          <span class="pause-icon" style="display: none;">⏸</span>
+        </button>
+        <button id="stop-btn" class="btn btn-control" disabled>⏹</button>
+        <div class="speed-control">
+          <label for="speed-select">Speed:</label>
+          <select id="speed-select">
+            <option value="0.5">0.5x</option>
+            <option value="0.75">0.75x</option>
+            <option value="1" selected>1.0x</option>
+            <option value="1.25">1.25x</option>
+            <option value="1.5">1.5x</option>
+            <option value="1.75">1.75x</option>
+            <option value="2">2.0x</option>
+            <option value="2.5">2.5x</option>
+            <option value="3">3.0x</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <!-- Status Display Section -->
+    <section class="section status-section">
+      <div id="playback-status" class="playback-status">
+        <span class="status-indicator idle"></span>
+        <span class="status-text">Ready</span>
+      </div>
+      <div id="error-display" class="error-display" style="display: none;"></div>
+    </section>
   </div>
   <script src="popup.js"></script>
 </body>
