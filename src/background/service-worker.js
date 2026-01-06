@@ -66,6 +66,118 @@ let audioContext = {
   offscreenReady: false   // Whether offscreen document is ready
 };
 
+/**
+ * Preload state for next paragraph audio
+ * Used for preemptive loading to eliminate delays between paragraphs
+ */
+let preloadState = {
+  paragraphIndex: null,      // Index of preloaded paragraph
+  audioData: null,           // Cached ArrayBuffer of audio
+  alignmentData: null,       // Cached alignment data
+  pendingRequest: null,      // Promise for in-flight preload request
+  abortController: null      // AbortController to cancel pending requests
+};
+
+/**
+ * Clear preload state and cancel any pending requests
+ */
+function clearPreloadState() {
+  if (preloadState.abortController) {
+    preloadState.abortController.abort();
+  }
+  preloadState = {
+    paragraphIndex: null,
+    audioData: null,
+    alignmentData: null,
+    pendingRequest: null,
+    abortController: null
+  };
+}
+
+/**
+ * Initiate preloading of next paragraph when conditions are met
+ * Called after playback starts successfully
+ * @param {number} currentParagraphIndex - Currently playing paragraph
+ */
+async function initiatePreload(currentParagraphIndex) {
+  const { autoContinue, totalParagraphs } = playbackState;
+  const nextIndex = currentParagraphIndex + 1;
+  
+  // Only preload if auto-continue is enabled and there's a next paragraph
+  if (!autoContinue || nextIndex >= totalParagraphs) {
+    return;
+  }
+  
+  // Don't preload if already preloading or have cached the correct paragraph
+  if (preloadState.paragraphIndex === nextIndex) {
+    return;
+  }
+  
+  // Don't preload if no active tab
+  if (!audioContext.tabId) {
+    return;
+  }
+  
+  // Clear any existing preload state
+  clearPreloadState();
+  
+  // Create abort controller for this request
+  preloadState.abortController = new AbortController();
+  preloadState.paragraphIndex = nextIndex;
+  
+  // Request next paragraph text from content script
+  try {
+    const response = await chrome.tabs.sendMessage(audioContext.tabId, {
+      type: MessageType.GET_NEXT_PARAGRAPH,
+      paragraphIndex: nextIndex
+    });
+    
+    if (!response?.success || !response?.text) {
+      clearPreloadState();
+      return;
+    }
+    
+    // Start preloading audio
+    preloadState.pendingRequest = preloadAudio(response.text, nextIndex);
+    await preloadState.pendingRequest;
+    
+  } catch (error) {
+    console.log('Preload failed, will load on-demand:', error.message);
+    clearPreloadState();
+  }
+}
+
+/**
+ * Preload audio for a paragraph
+ * @param {string} text - Paragraph text
+ * @param {number} paragraphIndex - Paragraph index
+ */
+async function preloadAudio(text, paragraphIndex) {
+  const apiKey = await getFromStorage(STORAGE_KEYS.API_KEY);
+  const voiceId = await getFromStorage(STORAGE_KEYS.SELECTED_VOICE_ID);
+  
+  if (!apiKey || !voiceId) {
+    throw new Error('Missing API key or voice');
+  }
+  
+  try {
+    const response = await generateSpeech(apiKey, text, voiceId);
+    
+    // Store in preload cache (only if still relevant)
+    if (preloadState.paragraphIndex === paragraphIndex) {
+      preloadState.audioData = response.audio;
+      preloadState.alignmentData = response.alignment;
+      preloadState.pendingRequest = null;
+    }
+  } catch (error) {
+    // Clear preload state on error
+    if (preloadState.paragraphIndex === paragraphIndex) {
+      clearPreloadState();
+    }
+    throw error;
+  }
+}
+
 
 /**
  * Storage keys (matching lib/storage.js)
@@ -253,6 +365,9 @@ async function handlePlay(payload) {
     
     await updatePlaybackState({ status: PlaybackStatus.PLAYING });
     
+    // Initiate preload for the next paragraph (for seamless auto-continue)
+    await initiatePreload(paragraphIndex);
+    
     return { success: true };
   } catch (error) {
     await updatePlaybackState({
@@ -288,6 +403,9 @@ async function handleStop() {
   // Reset state
   audioContext.audioData = null;
   audioContext.alignmentData = null;
+  
+  // Clear any preloaded audio since playback is stopping
+  clearPreloadState();
   
   await updatePlaybackState({
     status: PlaybackStatus.IDLE,
@@ -340,6 +458,10 @@ async function handleSetSpeed(payload) {
  * @returns {Promise<Object>}
  */
 async function handleJumpToParagraph(payload) {
+  // Clear any preloaded audio that is no longer relevant
+  // since the user is manually jumping to a different paragraph
+  clearPreloadState();
+  
   // Stop current playback first
   await handleStop();
   
@@ -424,6 +546,12 @@ async function handleSetAutoContinue(payload) {
   
   // Save to storage
   await saveToStorage(STORAGE_KEYS.AUTO_CONTINUE, autoContinue);
+  
+  // Clear preload state when auto-continue is disabled
+  // This cancels any pending preload requests and clears cached audio
+  if (!autoContinue) {
+    clearPreloadState();
+  }
   
   // Update playback state and broadcast change
   await updatePlaybackState({ autoContinue });
@@ -640,6 +768,7 @@ async function requestNextParagraph(paragraphIndex) {
 /**
  * Handle audio playback ended event
  * Implements auto-continue logic to play next paragraph if enabled
+ * Uses preloaded audio when available for seamless transitions
  * @returns {Promise<void>}
  */
 async function handleAudioEnded() {
@@ -650,15 +779,76 @@ async function handleAudioEnded() {
   audioContext.alignmentData = null;
   
   // Check if auto-continue is enabled and there's a next paragraph
-  if (autoContinue && currentParagraphIndex < totalParagraphs - 1) {
-    // Set status to loading before requesting next paragraph
-    await updatePlaybackState({ status: PlaybackStatus.LOADING });
-    // Request next paragraph from content script
-    await requestNextParagraph(currentParagraphIndex + 1);
-  } else {
+  if (!autoContinue || currentParagraphIndex >= totalParagraphs - 1) {
     // Stop playback - either auto-continue is disabled or we're at the last paragraph
+    clearPreloadState();
     await handleStop();
+    return;
   }
+  
+  const nextIndex = currentParagraphIndex + 1;
+  
+  // Check if we have preloaded audio for the next paragraph
+  if (preloadState.paragraphIndex === nextIndex && preloadState.audioData) {
+    // Use cached audio immediately
+    await playPreloadedAudio(nextIndex);
+  } else if (preloadState.paragraphIndex === nextIndex && preloadState.pendingRequest) {
+    // Wait for pending preload to complete
+    await updatePlaybackState({ status: PlaybackStatus.LOADING });
+    try {
+      await preloadState.pendingRequest;
+      if (preloadState.audioData) {
+        await playPreloadedAudio(nextIndex);
+      } else {
+        // Preload failed, fall back to on-demand
+        await requestNextParagraph(nextIndex);
+      }
+    } catch (error) {
+      // Preload failed, fall back to on-demand
+      console.log('Preload request failed, falling back to on-demand:', error.message);
+      await requestNextParagraph(nextIndex);
+    }
+  } else {
+    // No preload available, load on-demand (fallback)
+    await updatePlaybackState({ status: PlaybackStatus.LOADING });
+    await requestNextParagraph(nextIndex);
+  }
+}
+
+/**
+ * Play preloaded audio for a paragraph
+ * Moves preloaded data to active audio context and starts playback
+ * @param {number} paragraphIndex - Paragraph index to play
+ * @returns {Promise<void>}
+ */
+async function playPreloadedAudio(paragraphIndex) {
+  // Move preloaded data to active audio context
+  audioContext.audioData = preloadState.audioData;
+  audioContext.alignmentData = preloadState.alignmentData;
+  
+  // Clear preload state
+  clearPreloadState();
+  
+  // Update state
+  await updatePlaybackState({
+    status: PlaybackStatus.PLAYING,
+    currentParagraphIndex: paragraphIndex,
+    currentSentenceIndex: 0,
+    currentWordIndex: 0,
+    currentTime: 0
+  });
+  
+  // Play the audio
+  await ensureOffscreenDocument();
+  const audioBase64 = arrayBufferToBase64(audioContext.audioData);
+  await sendToOffscreen({
+    type: 'play',
+    audioBase64: audioBase64,
+    speed: playbackState.speed
+  });
+  
+  // Initiate preload for the next paragraph
+  await initiatePreload(paragraphIndex);
 }
 
 /**
@@ -812,7 +1002,15 @@ if (typeof module !== 'undefined' && module.exports) {
     handleGetState,
     handleSetAutoContinue,
     handleSetTotalParagraphs,
+    handleJumpToParagraph,
     handleAudioEnded,
-    requestNextParagraph
+    requestNextParagraph,
+    // Preload functions
+    clearPreloadState,
+    initiatePreload,
+    preloadAudio,
+    playPreloadedAudio,
+    getPreloadState: () => ({ ...preloadState }),
+    setAudioContextTabId: (tabId) => { audioContext.tabId = tabId; }
   };
 }
