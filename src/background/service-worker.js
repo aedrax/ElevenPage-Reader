@@ -228,9 +228,13 @@ async function handlePlay(payload) {
     
     // Ensure offscreen document exists and play audio
     await ensureOffscreenDocument();
+    
+    // Convert ArrayBuffer to base64 for messaging (ArrayBuffer can't be sent directly)
+    const audioBase64 = arrayBufferToBase64(response.audio);
+    
     await sendToOffscreen({
       type: 'play',
-      audio: response.audio,
+      audioBase64: audioBase64,
       speed: playbackState.speed
     });
     
@@ -472,6 +476,20 @@ async function fetchVoices(apiKey) {
   }));
 }
 
+
+/**
+ * Convert ArrayBuffer to base64 string for messaging
+ * @param {ArrayBuffer} buffer - ArrayBuffer to convert
+ * @returns {string} Base64 encoded string
+ */
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
 
 /**
  * Offscreen document path

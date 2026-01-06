@@ -17,6 +17,20 @@ let currentSpeed = 1.0;
 let timeUpdateInterval = null;
 
 /**
+ * Convert base64 string to ArrayBuffer
+ * @param {string} base64 - Base64 encoded string
+ * @returns {ArrayBuffer}
+ */
+function base64ToArrayBuffer(base64) {
+  const binaryString = atob(base64);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes.buffer;
+}
+
+/**
  * Create audio element from ArrayBuffer
  * @param {ArrayBuffer} audioData - Audio data as ArrayBuffer
  * @returns {HTMLAudioElement}
@@ -104,12 +118,14 @@ function sendToServiceWorker(message) {
 
 /**
  * Handle play command
- * @param {ArrayBuffer} audioData - Audio data to play
+ * @param {string} audioBase64 - Base64 encoded audio data
  * @param {number} speed - Playback speed
  */
-async function handlePlay(audioData, speed) {
+async function handlePlay(audioBase64, speed) {
   currentSpeed = speed;
   
+  // Convert base64 back to ArrayBuffer
+  const audioData = base64ToArrayBuffer(audioBase64);
   const audio = createAudioElement(audioData);
   
   try {
@@ -189,7 +205,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   
   switch (message.type) {
     case 'play':
-      handlePlay(message.audio, message.speed);
+      handlePlay(message.audioBase64, message.speed);
       break;
       
     case 'pause':

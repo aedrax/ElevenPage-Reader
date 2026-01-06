@@ -112,11 +112,11 @@ function injectButtons(paragraphs) {
     return [];
   }
   
-  // Store reference for click handlers
-  paragraphsData = paragraphs;
-  
   // Clean up any existing buttons first
   removeButtons();
+  
+  // Store reference for click handlers (after removeButtons to avoid being cleared)
+  paragraphsData = paragraphs;
   
   const buttons = [];
   

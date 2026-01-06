@@ -394,8 +394,8 @@ async function handleParagraphButtonClick(event) {
 
 function injectButtons(paragraphs) {
   if (!paragraphs || !Array.isArray(paragraphs)) return [];
-  paragraphsData = paragraphs;
   removeButtons();
+  paragraphsData = paragraphs;
   const buttons = [];
   for (let i = 0; i < paragraphs.length; i++) {
     const paragraph = paragraphs[i];
