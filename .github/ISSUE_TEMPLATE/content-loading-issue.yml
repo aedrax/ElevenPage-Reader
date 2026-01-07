@@ -1,0 +1,59 @@
+name: Content Loading Issue
+description: Report a website where content isn't loading or parsing correctly
+title: "[Content Issue]: "
+labels: ["bug", "content-parsing"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve ElevenPage Reader! Please provide details about the website where content isn't loading correctly.
+
+  - type: input
+    id: url
+    attributes:
+      label: Website URL
+      description: Link to the page where content isn't loading correctly
+      placeholder: https://example.com/article
+    validations:
+      required: true
+
+  - type: dropdown
+    id: issue-type
+    attributes:
+      label: Issue Type
+      description: What kind of problem are you experiencing?
+      options:
+        - No text detected on page
+        - Some paragraphs missing
+        - Wrong content selected (ads, menus, etc.)
+        - Text appears but won't play
+        - Highlighting not working
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Describe what's happening vs what you expected
+      placeholder: "The extension doesn't detect any paragraphs on this article page..."
+    validations:
+      required: true
+
+  - type: input
+    id: browser
+    attributes:
+      label: Browser & Version
+      description: e.g., Chrome 120, Brave 1.61
+      placeholder: Chrome 120
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any other details, screenshots, or console errors
+    validations:
+      required: false
