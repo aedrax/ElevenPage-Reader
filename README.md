@@ -25,6 +25,7 @@ Before installing, ensure you have:
 1. **Google Chrome** (or a Chromium-based browser like Brave or Edge).  
 2. **Node.js** (for building the extension).
 3. An **ElevenLabs Account** with an active API Key.  
+   * Get your API key here: **[ElevenLabs API Keys](https://elevenlabs.io/app/developers/api-keys)**
    * *Note: Word-level highlighting requires the ElevenLabs API to return timestamp information. Ensure your tier supports the required latency/features.*
 
 ## **🚀 Installation (Developer Mode)**

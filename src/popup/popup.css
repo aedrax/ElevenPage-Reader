@@ -173,6 +173,23 @@ body {
   background: white;
 }
 
+/* API Key Help Link */
+.api-key-help {
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.api-key-help a {
+  color: #4a90d9;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.api-key-help a:hover {
+  color: #3a7bc8;
+  text-decoration: underline;
+}
+
 /* Status Messages */
 .status-message {
   font-size: 12px;
