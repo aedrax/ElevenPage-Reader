@@ -4,6 +4,13 @@
 
 This extension integrates directly with your ElevenLabs account, allowing you to listen to articles, blogs, and documentation with precision highlighting and full playback control.
 
+## **🎬 Demo**
+
+
+https://github.com/user-attachments/assets/784adede-c20d-409e-a711-d525252eec8e
+
+
+
 ## **✨ Features**
 
 * **ElevenLabs Integration:** Connects directly to the ElevenLabs API using your personal API key.  
