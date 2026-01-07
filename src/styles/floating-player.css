@@ -94,6 +94,36 @@
   transform: scale(0.95);
 }
 
+/* Skip Previous button */
+.elevenlabs-fp-skip-prev {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.elevenlabs-fp-skip-prev:hover:not(:disabled) {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.elevenlabs-fp-skip-prev:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+/* Skip Next button */
+.elevenlabs-fp-skip-next {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.elevenlabs-fp-skip-next:hover:not(:disabled) {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.elevenlabs-fp-skip-next:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
 /* Stop button */
 .elevenlabs-fp-stop {
   background: #f3f4f6;
@@ -223,6 +253,26 @@
 
   .elevenlabs-fp-controls {
     border-bottom-color: #374151;
+  }
+
+  .elevenlabs-fp-skip-prev {
+    background: #374151;
+    color: #9ca3af;
+  }
+
+  .elevenlabs-fp-skip-prev:hover:not(:disabled) {
+    background: #4b5563;
+    color: #d1d5db;
+  }
+
+  .elevenlabs-fp-skip-next {
+    background: #374151;
+    color: #9ca3af;
+  }
+
+  .elevenlabs-fp-skip-next:hover:not(:disabled) {
+    background: #4b5563;
+    color: #d1d5db;
   }
 
   .elevenlabs-fp-stop {

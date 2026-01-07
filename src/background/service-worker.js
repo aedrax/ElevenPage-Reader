@@ -11,6 +11,8 @@ const MessageType = {
   STOP: 'stop',
   SET_SPEED: 'setSpeed',
   JUMP_TO_PARAGRAPH: 'jumpToParagraph',
+  SKIP_NEXT: 'skipNext',
+  SKIP_PREVIOUS: 'skipPrevious',
   
   // State queries
   GET_STATE: 'getState',
@@ -43,6 +45,13 @@ const PlaybackStatus = {
   PAUSED: 'paused',
   ERROR: 'error'
 };
+
+/**
+ * Early threshold in seconds for skip previous behavior
+ * If current time < threshold, go to previous paragraph
+ * If current time >= threshold, restart current paragraph
+ */
+const SKIP_PREVIOUS_THRESHOLD = 3;
 
 /**
  * Current playback state
@@ -453,6 +462,42 @@ async function handleSetSpeed(payload) {
 
 
 /**
+ * Handle SKIP_NEXT message
+ * Advances to the next paragraph if one exists
+ * @returns {Promise<Object>}
+ */
+async function handleSkipNext() {
+  const { currentParagraphIndex, totalParagraphs } = playbackState;
+  const nextIndex = currentParagraphIndex + 1;
+  
+  // Check if next paragraph exists
+  if (nextIndex >= totalParagraphs) {
+    // No next paragraph - stop playback
+    return handleStop();
+  }
+  
+  // Request and play next paragraph
+  return requestAndPlayParagraph(nextIndex);
+}
+
+/**
+ * Handle SKIP_PREVIOUS message
+ * Either restarts current paragraph or goes to previous based on current time
+ * @returns {Promise<Object>}
+ */
+async function handleSkipPrevious() {
+  const { currentParagraphIndex, currentTime } = playbackState;
+  
+  // If time >= threshold OR at first paragraph, restart current paragraph
+  if (currentTime >= SKIP_PREVIOUS_THRESHOLD || currentParagraphIndex === 0) {
+    return requestAndPlayParagraph(currentParagraphIndex);
+  }
+  
+  // Go to previous paragraph (time < threshold AND previous exists)
+  return requestAndPlayParagraph(currentParagraphIndex - 1);
+}
+
+/**
  * Handle JUMP_TO_PARAGRAPH message
  * @param {Object} payload - Jump payload
  * @param {number} payload.paragraphIndex - Paragraph index to jump to
@@ -757,6 +802,56 @@ async function sendToOffscreen(message) {
 }
 
 /**
+ * Request paragraph text from content script and initiate playback
+ * Used for skip next/previous navigation
+ * @param {number} paragraphIndex - Index of paragraph to play
+ * @returns {Promise<Object>}
+ */
+async function requestAndPlayParagraph(paragraphIndex) {
+  // Clear preload state since we're manually navigating
+  clearPreloadState();
+  
+  // Stop current audio via offscreen
+  await sendToOffscreen({ type: 'stop' });
+  
+  // Update state to loading
+  await updatePlaybackState({
+    status: PlaybackStatus.LOADING,
+    currentParagraphIndex: paragraphIndex,
+    currentTime: 0
+  });
+  
+  // Request paragraph text from content script
+  if (!audioContext.tabId) {
+    await handleStop();
+    return { success: false, error: 'No active tab' };
+  }
+  
+  try {
+    const response = await chrome.tabs.sendMessage(audioContext.tabId, {
+      type: MessageType.GET_NEXT_PARAGRAPH,
+      paragraphIndex
+    });
+    
+    if (!response?.success || !response?.text) {
+      await handleStop();
+      return { success: false, error: 'Failed to get paragraph text' };
+    }
+    
+    // Play the paragraph
+    return handlePlay({
+      tabId: audioContext.tabId,
+      text: response.text,
+      paragraphIndex
+    });
+  } catch (error) {
+    console.error('Error during paragraph skip:', error);
+    await handleStop();
+    return { success: false, error: error.message };
+  }
+}
+
+/**
  * Request next paragraph text from content script and initiate playback
  * @param {number} paragraphIndex - Index of the paragraph to request
  * @returns {Promise<void>}
@@ -956,6 +1051,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       case MessageType.JUMP_TO_PARAGRAPH:
         return handleJumpToParagraph({ ...message.payload, tabId: sender.tab?.id });
         
+      case MessageType.SKIP_NEXT:
+        return handleSkipNext();
+        
+      case MessageType.SKIP_PREVIOUS:
+        return handleSkipPrevious();
+        
       case MessageType.GET_STATE:
         return handleGetState();
         
@@ -1022,6 +1123,7 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     MessageType,
     PlaybackStatus,
+    SKIP_PREVIOUS_THRESHOLD,
     getPlaybackState,
     updatePlaybackState,
     broadcastStateChange,
@@ -1034,6 +1136,9 @@ if (typeof module !== 'undefined' && module.exports) {
     handleSetAutoContinue,
     handleSetTotalParagraphs,
     handleJumpToParagraph,
+    handleSkipNext,
+    handleSkipPrevious,
+    requestAndPlayParagraph,
     handleAudioEnded,
     requestNextParagraph,
     // Preload functions

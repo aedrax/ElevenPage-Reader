@@ -19,7 +19,7 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["src/content/content.js"],
+      "js": ["dist/content-entry.js"],
       "css": ["src/styles/highlights.css", "src/styles/floating-player.css", "src/styles/paragraph-buttons.css"],
       "run_at": "document_idle"
     }

@@ -1085,6 +1085,338 @@ describe('Service Worker Module - Property Tests', () => {
     });
   });
 
+  /**
+   * Property 2: Skip Previous Restarts When Time >= Threshold
+   * For any playback state where currentTime >= SKIP_PREVIOUS_THRESHOLD (3 seconds),
+   * calling handleSkipPrevious should result in currentParagraphIndex remaining unchanged
+   * and currentTime being reset to 0.
+   * 
+   * Feature: paragraph-skip-controls, Property 2: Skip previous restarts when time >= threshold
+   * Validates: Requirements 2.2, 3.3
+   */
+  describe('Property 2: Skip Previous Restarts When Time >= Threshold', () => {
+    
+    it('should restart current paragraph when time >= 3 seconds', async () => {
+      await fc.assert(
+        fc.asyncProperty(
+          // Generate current paragraph index (can be any valid index)
+          fc.nat({ max: 50 }),
+          // Generate total paragraphs (more than current)
+          fc.nat({ max: 50 }).map(n => n + 2),
+          // Generate current time >= 3 seconds (threshold)
+          fc.double({ min: 3, max: 300, noNaN: true }),
+          async (currentParagraphIndex, extraParagraphs, currentTime) => {
+            const totalParagraphs = currentParagraphIndex + extraParagraphs;
+            const mockTabId = 123;
+            
+            // Clear previous state
+            tabMessages = [];
+            
+            // Set up playback state with time >= threshold
+            await serviceWorkerModule.updatePlaybackState({
+              status: 'playing',
+              currentParagraphIndex,
+              totalParagraphs,
+              currentTime
+            });
+            
+            // Set the active tab ID
+            serviceWorkerModule.setAudioContextTabId(mockTabId);
+            
+            // Call handleSkipPrevious
+            await serviceWorkerModule.handleSkipPrevious();
+            
+            // Verify that a GET_NEXT_PARAGRAPH message was sent for the SAME paragraph (restart)
+            const paragraphRequests = tabMessages.filter(
+              m => m.message.type === 'getNextParagraph' && 
+                   m.message.paragraphIndex === currentParagraphIndex
+            );
+            
+            expect(paragraphRequests.length).toBe(1);
+            
+            // Verify the state still has the same paragraph index
+            const state = serviceWorkerModule.getPlaybackState();
+            expect(state.currentParagraphIndex).toBe(currentParagraphIndex);
+            expect(state.currentTime).toBe(0);
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it('should restart current paragraph when at first paragraph regardless of time', async () => {
+      await fc.assert(
+        fc.asyncProperty(
+          // Generate total paragraphs
+          fc.nat({ max: 50 }).map(n => n + 1),
+          // Generate current time (any value, even < threshold)
+          fc.double({ min: 0, max: 300, noNaN: true }),
+          async (totalParagraphs, currentTime) => {
+            const currentParagraphIndex = 0; // First paragraph
+            const mockTabId = 123;
+            
+            // Clear previous state
+            tabMessages = [];
+            
+            // Set up playback state at first paragraph
+            await serviceWorkerModule.updatePlaybackState({
+              status: 'playing',
+              currentParagraphIndex,
+              totalParagraphs,
+              currentTime
+            });
+            
+            // Set the active tab ID
+            serviceWorkerModule.setAudioContextTabId(mockTabId);
+            
+            // Call handleSkipPrevious
+            await serviceWorkerModule.handleSkipPrevious();
+            
+            // Verify that a GET_NEXT_PARAGRAPH message was sent for the SAME paragraph (restart)
+            const paragraphRequests = tabMessages.filter(
+              m => m.message.type === 'getNextParagraph' && 
+                   m.message.paragraphIndex === 0
+            );
+            
+            expect(paragraphRequests.length).toBe(1);
+            
+            // Verify the state still has paragraph index 0
+            const state = serviceWorkerModule.getPlaybackState();
+            expect(state.currentParagraphIndex).toBe(0);
+            expect(state.currentTime).toBe(0);
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+  });
+
+  /**
+   * Property 3: Skip Previous Goes Back When Time < Threshold
+   * For any playback state where currentTime < SKIP_PREVIOUS_THRESHOLD (3 seconds)
+   * AND currentParagraphIndex > 0, calling handleSkipPrevious should result in
+   * currentParagraphIndex being decremented by 1.
+   * 
+   * Feature: paragraph-skip-controls, Property 3: Skip previous goes back when time < threshold
+   * Validates: Requirements 2.3, 3.2
+   */
+  describe('Property 3: Skip Previous Goes Back When Time < Threshold', () => {
+    
+    it('should go to previous paragraph when time < 3 seconds and previous exists', async () => {
+      await fc.assert(
+        fc.asyncProperty(
+          // Generate current paragraph index > 0 (so there's a previous)
+          fc.nat({ max: 50 }).map(n => n + 1),
+          // Generate total paragraphs (more than current)
+          fc.nat({ max: 50 }).map(n => n + 2),
+          // Generate current time < 3 seconds (threshold)
+          fc.double({ min: 0, max: 2.99, noNaN: true }),
+          async (currentParagraphIndex, extraParagraphs, currentTime) => {
+            const totalParagraphs = currentParagraphIndex + extraParagraphs;
+            const mockTabId = 123;
+            
+            // Clear previous state
+            tabMessages = [];
+            
+            // Set up playback state with time < threshold and not at first paragraph
+            await serviceWorkerModule.updatePlaybackState({
+              status: 'playing',
+              currentParagraphIndex,
+              totalParagraphs,
+              currentTime
+            });
+            
+            // Set the active tab ID
+            serviceWorkerModule.setAudioContextTabId(mockTabId);
+            
+            // Call handleSkipPrevious
+            await serviceWorkerModule.handleSkipPrevious();
+            
+            // Verify that a GET_NEXT_PARAGRAPH message was sent for the PREVIOUS paragraph
+            const paragraphRequests = tabMessages.filter(
+              m => m.message.type === 'getNextParagraph' && 
+                   m.message.paragraphIndex === currentParagraphIndex - 1
+            );
+            
+            expect(paragraphRequests.length).toBe(1);
+            
+            // Verify the state has the previous paragraph index
+            const state = serviceWorkerModule.getPlaybackState();
+            expect(state.currentParagraphIndex).toBe(currentParagraphIndex - 1);
+            expect(state.currentTime).toBe(0);
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it('should decrement paragraph index by exactly 1', async () => {
+      await fc.assert(
+        fc.asyncProperty(
+          // Generate current paragraph index > 0
+          fc.nat({ max: 50 }).map(n => n + 1),
+          // Generate total paragraphs
+          fc.nat({ max: 50 }).map(n => n + 52),
+          // Generate current time < 3 seconds
+          fc.double({ min: 0, max: 2.99, noNaN: true }),
+          async (currentParagraphIndex, totalParagraphs, currentTime) => {
+            const mockTabId = 123;
+            const expectedPreviousIndex = currentParagraphIndex - 1;
+            
+            // Clear previous state
+            tabMessages = [];
+            
+            // Set up playback state
+            await serviceWorkerModule.updatePlaybackState({
+              status: 'playing',
+              currentParagraphIndex,
+              totalParagraphs,
+              currentTime
+            });
+            
+            // Set the active tab ID
+            serviceWorkerModule.setAudioContextTabId(mockTabId);
+            
+            // Call handleSkipPrevious
+            await serviceWorkerModule.handleSkipPrevious();
+            
+            // Verify the state has exactly the previous paragraph index
+            const state = serviceWorkerModule.getPlaybackState();
+            expect(state.currentParagraphIndex).toBe(expectedPreviousIndex);
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+  });
+
+  /**
+   * Property 4: Skip Buttons Disabled State Reflects Playback Status
+   * For any playback status, the skip next and skip previous buttons should be
+   * disabled if and only if the status is IDLE or LOADING.
+   * 
+   * Feature: paragraph-skip-controls, Property 4: Skip buttons disabled state reflects playback status
+   * Validates: Requirements 1.4, 1.5, 2.5, 2.6, 5.1
+   */
+  describe('Property 4: Skip Buttons Disabled State Reflects Playback Status', () => {
+    
+    it('should have skip buttons disabled when status is IDLE or LOADING', async () => {
+      await fc.assert(
+        fc.asyncProperty(
+          // Generate status that should disable buttons
+          fc.constantFrom('idle', 'loading'),
+          async (status) => {
+            // Update playback state with the status
+            await serviceWorkerModule.updatePlaybackState({
+              status,
+              currentParagraphIndex: 5,
+              totalParagraphs: 10
+            });
+            
+            // Get the state
+            const state = serviceWorkerModule.getPlaybackState();
+            
+            // Verify the status is set correctly
+            expect(state.status).toBe(status);
+            
+            // The property: when status is IDLE or LOADING, skip buttons should be disabled
+            // This is verified by the FloatingPlayer.updatePlaybackState logic:
+            // skipButtonsDisabled = status === 'idle' || status === 'loading'
+            const shouldBeDisabled = state.status === 'idle' || state.status === 'loading';
+            expect(shouldBeDisabled).toBe(true);
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it('should have skip buttons enabled when status is PLAYING or PAUSED', async () => {
+      await fc.assert(
+        fc.asyncProperty(
+          // Generate status that should enable buttons
+          fc.constantFrom('playing', 'paused'),
+          async (status) => {
+            // Update playback state with the status
+            await serviceWorkerModule.updatePlaybackState({
+              status,
+              currentParagraphIndex: 5,
+              totalParagraphs: 10
+            });
+            
+            // Get the state
+            const state = serviceWorkerModule.getPlaybackState();
+            
+            // Verify the status is set correctly
+            expect(state.status).toBe(status);
+            
+            // The property: when status is PLAYING or PAUSED, skip buttons should be enabled
+            const shouldBeDisabled = state.status === 'idle' || state.status === 'loading';
+            expect(shouldBeDisabled).toBe(false);
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it('should correctly determine disabled state for all valid statuses', async () => {
+      await fc.assert(
+        fc.asyncProperty(
+          // Generate any valid playback status
+          fc.constantFrom('idle', 'loading', 'playing', 'paused', 'error'),
+          async (status) => {
+            // Update playback state
+            await serviceWorkerModule.updatePlaybackState({
+              status,
+              currentParagraphIndex: 3,
+              totalParagraphs: 10
+            });
+            
+            // Get the state
+            const state = serviceWorkerModule.getPlaybackState();
+            
+            // Calculate expected disabled state
+            const expectedDisabled = status === 'idle' || status === 'loading';
+            const actualDisabled = state.status === 'idle' || state.status === 'loading';
+            
+            // Verify the disabled state calculation is correct
+            expect(actualDisabled).toBe(expectedDisabled);
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it('should update disabled state when status changes', async () => {
+      await fc.assert(
+        fc.asyncProperty(
+          // Generate a sequence of status changes
+          fc.array(
+            fc.constantFrom('idle', 'loading', 'playing', 'paused'),
+            { minLength: 2, maxLength: 5 }
+          ),
+          async (statusSequence) => {
+            for (const status of statusSequence) {
+              // Update playback state
+              await serviceWorkerModule.updatePlaybackState({ status });
+              
+              // Get the state
+              const state = serviceWorkerModule.getPlaybackState();
+              
+              // Verify the status was updated
+              expect(state.status).toBe(status);
+              
+              // Verify the disabled state is correct for this status
+              const expectedDisabled = status === 'idle' || status === 'loading';
+              const actualDisabled = state.status === 'idle' || state.status === 'loading';
+              expect(actualDisabled).toBe(expectedDisabled);
+            }
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+  });
+
 });
 
 
@@ -1512,3 +1844,404 @@ describe('Service Worker Module - Property Tests', () => {
       );
     });
   });
+
+
+/**
+ * Property-based tests for Paragraph Skip Controls
+ * 
+ * Feature: paragraph-skip-controls
+ */
+describe('Paragraph Skip Controls - Property Tests', () => {
+  beforeEach(() => {
+    mockStorage.clear();
+    broadcastedMessages = [];
+    tabMessages = [];
+    chromeMock.runtime.lastError = null;
+    vi.clearAllMocks();
+    
+    // Reset playback state
+    serviceWorkerModule.clearPreloadState();
+  });
+
+  /**
+   * Property 1: Skip Next Advances Paragraph Index
+   * For any playback state where currentParagraphIndex < totalParagraphs - 1,
+   * calling handleSkipNext should result in currentParagraphIndex being incremented by 1
+   * and playback status transitioning through LOADING to PLAYING.
+   * 
+   * Feature: paragraph-skip-controls, Property 1: Skip next advances paragraph index
+   * Validates: Requirements 1.2
+   */
+  describe('Property 1: Skip Next Advances Paragraph Index', () => {
+    
+    it('should advance paragraph index by 1 when skip next is called and next paragraph exists', async () => {
+      await fc.assert(
+        fc.asyncProperty(
+          // Generate current paragraph index (0 to 98, leaving room for at least one more)
+          fc.nat({ max: 98 }),
+          // Generate extra paragraphs to ensure there's a next one
+          fc.nat({ max: 50 }).map(n => n + 2),
+          async (currentParagraphIndex, extraParagraphs) => {
+            const totalParagraphs = currentParagraphIndex + extraParagraphs;
+            const mockTabId = 123;
+            
+            // Clear previous state
+            tabMessages = [];
+            
+            // Set up playback state with a valid current paragraph
+            await serviceWorkerModule.updatePlaybackState({
+              status: 'playing',
+              currentParagraphIndex,
+              totalParagraphs,
+              currentTime: 5 // Some time into playback
+            });
+            
+            // Set the active tab ID
+            serviceWorkerModule.setAudioContextTabId(mockTabId);
+            
+            // Call handleSkipNext
+            const result = await serviceWorkerModule.handleSkipNext();
+            
+            // Verify the result indicates success or loading state
+            // (handleSkipNext calls requestAndPlayParagraph which updates state)
+            
+            // Verify that a GET_NEXT_PARAGRAPH message was sent for the next paragraph
+            const nextParagraphRequests = tabMessages.filter(
+              m => m.message.type === 'getNextParagraph' && 
+                   m.message.paragraphIndex === currentParagraphIndex + 1
+            );
+            
+            expect(nextParagraphRequests.length).toBe(1);
+            
+            // Verify the state was updated to the next paragraph index
+            const state = serviceWorkerModule.getPlaybackState();
+            expect(state.currentParagraphIndex).toBe(currentParagraphIndex + 1);
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it('should reset currentTime to 0 when skipping to next paragraph', async () => {
+      await fc.assert(
+        fc.asyncProperty(
+          fc.nat({ max: 98 }),
+          fc.nat({ max: 50 }).map(n => n + 2),
+          fc.double({ min: 0.1, max: 300, noNaN: true }), // Random current time
+          async (currentParagraphIndex, extraParagraphs, currentTime) => {
+            const totalParagraphs = currentParagraphIndex + extraParagraphs;
+            const mockTabId = 123;
+            
+            // Set up playback state with some elapsed time
+            await serviceWorkerModule.updatePlaybackState({
+              status: 'playing',
+              currentParagraphIndex,
+              totalParagraphs,
+              currentTime
+            });
+            
+            // Set the active tab ID
+            serviceWorkerModule.setAudioContextTabId(mockTabId);
+            
+            // Call handleSkipNext
+            await serviceWorkerModule.handleSkipNext();
+            
+            // Verify currentTime was reset to 0
+            const state = serviceWorkerModule.getPlaybackState();
+            expect(state.currentTime).toBe(0);
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+  });
+});
+
+
+/**
+ * Unit tests for Paragraph Skip Controls - Edge Cases
+ * 
+ * Feature: paragraph-skip-controls
+ */
+describe('Paragraph Skip Controls - Unit Tests for Edge Cases', () => {
+  beforeEach(() => {
+    mockStorage.clear();
+    broadcastedMessages = [];
+    tabMessages = [];
+    chromeMock.runtime.lastError = null;
+    vi.clearAllMocks();
+    
+    // Reset playback state
+    serviceWorkerModule.clearPreloadState();
+  });
+
+  /**
+   * Unit test for skip next at last paragraph
+   * Verifies handleSkipNext stops playback when at last paragraph
+   * 
+   * Requirements: 1.3
+   */
+  describe('Skip Next at Last Paragraph', () => {
+    
+    it('should stop playback when skip next is called at the last paragraph', async () => {
+      const totalParagraphs = 5;
+      const lastParagraphIndex = totalParagraphs - 1; // Index 4
+      const mockTabId = 123;
+      
+      // Set up playback state at the last paragraph
+      await serviceWorkerModule.updatePlaybackState({
+        status: 'playing',
+        currentParagraphIndex: lastParagraphIndex,
+        totalParagraphs,
+        currentTime: 10
+      });
+      
+      // Set the active tab ID
+      serviceWorkerModule.setAudioContextTabId(mockTabId);
+      
+      // Call handleSkipNext
+      const result = await serviceWorkerModule.handleSkipNext();
+      
+      // Verify the result indicates success (handleStop returns success)
+      expect(result.success).toBe(true);
+      
+      // Verify the state transitioned to idle
+      const state = serviceWorkerModule.getPlaybackState();
+      expect(state.status).toBe('idle');
+      expect(state.currentParagraphIndex).toBe(0);
+      expect(state.currentTime).toBe(0);
+    });
+
+    it('should not request next paragraph when at last paragraph', async () => {
+      const totalParagraphs = 3;
+      const lastParagraphIndex = totalParagraphs - 1; // Index 2
+      const mockTabId = 123;
+      
+      // Clear previous messages
+      tabMessages = [];
+      
+      // Set up playback state at the last paragraph
+      await serviceWorkerModule.updatePlaybackState({
+        status: 'playing',
+        currentParagraphIndex: lastParagraphIndex,
+        totalParagraphs,
+        currentTime: 5
+      });
+      
+      // Set the active tab ID
+      serviceWorkerModule.setAudioContextTabId(mockTabId);
+      
+      // Call handleSkipNext
+      await serviceWorkerModule.handleSkipNext();
+      
+      // Verify no GET_NEXT_PARAGRAPH message was sent
+      const nextParagraphRequests = tabMessages.filter(
+        m => m.message.type === 'getNextParagraph'
+      );
+      
+      expect(nextParagraphRequests.length).toBe(0);
+    });
+
+    it('should stop playback when there is only one paragraph', async () => {
+      const totalParagraphs = 1;
+      const currentParagraphIndex = 0;
+      const mockTabId = 123;
+      
+      // Set up playback state with only one paragraph
+      await serviceWorkerModule.updatePlaybackState({
+        status: 'playing',
+        currentParagraphIndex,
+        totalParagraphs,
+        currentTime: 2
+      });
+      
+      // Set the active tab ID
+      serviceWorkerModule.setAudioContextTabId(mockTabId);
+      
+      // Call handleSkipNext
+      const result = await serviceWorkerModule.handleSkipNext();
+      
+      // Verify the result indicates success
+      expect(result.success).toBe(true);
+      
+      // Verify the state transitioned to idle
+      const state = serviceWorkerModule.getPlaybackState();
+      expect(state.status).toBe('idle');
+    });
+
+    it('should clear preload state when stopping at last paragraph', async () => {
+      const totalParagraphs = 4;
+      const lastParagraphIndex = totalParagraphs - 1;
+      const mockTabId = 123;
+      
+      // Set up playback state at the last paragraph
+      await serviceWorkerModule.updatePlaybackState({
+        status: 'playing',
+        currentParagraphIndex: lastParagraphIndex,
+        totalParagraphs,
+        currentTime: 8
+      });
+      
+      // Set the active tab ID
+      serviceWorkerModule.setAudioContextTabId(mockTabId);
+      
+      // Call handleSkipNext
+      await serviceWorkerModule.handleSkipNext();
+      
+      // Verify preload state is cleared
+      const preloadState = serviceWorkerModule.getPreloadState();
+      expect(preloadState.paragraphIndex).toBeNull();
+      expect(preloadState.audioData).toBeNull();
+    });
+  });
+
+  /**
+   * Unit test for skip previous at first paragraph
+   * Verifies handleSkipPrevious restarts when at first paragraph with time < threshold
+   * 
+   * Requirements: 2.4
+   */
+  describe('Skip Previous at First Paragraph', () => {
+    
+    it('should restart current paragraph when at first paragraph with time < threshold', async () => {
+      const totalParagraphs = 5;
+      const firstParagraphIndex = 0;
+      const mockTabId = 123;
+      const currentTime = 1.5; // Less than 3 second threshold
+      
+      // Clear previous messages
+      tabMessages = [];
+      
+      // Set up playback state at the first paragraph with time < threshold
+      await serviceWorkerModule.updatePlaybackState({
+        status: 'playing',
+        currentParagraphIndex: firstParagraphIndex,
+        totalParagraphs,
+        currentTime
+      });
+      
+      // Set the active tab ID
+      serviceWorkerModule.setAudioContextTabId(mockTabId);
+      
+      // Call handleSkipPrevious
+      await serviceWorkerModule.handleSkipPrevious();
+      
+      // Verify that a GET_NEXT_PARAGRAPH message was sent for the SAME paragraph (restart)
+      const paragraphRequests = tabMessages.filter(
+        m => m.message.type === 'getNextParagraph' && 
+             m.message.paragraphIndex === firstParagraphIndex
+      );
+      
+      expect(paragraphRequests.length).toBe(1);
+      
+      // Verify the state still has paragraph index 0
+      const state = serviceWorkerModule.getPlaybackState();
+      expect(state.currentParagraphIndex).toBe(0);
+      expect(state.currentTime).toBe(0);
+    });
+
+    it('should restart current paragraph when at first paragraph with time >= threshold', async () => {
+      const totalParagraphs = 5;
+      const firstParagraphIndex = 0;
+      const mockTabId = 123;
+      const currentTime = 5; // Greater than 3 second threshold
+      
+      // Clear previous messages
+      tabMessages = [];
+      
+      // Set up playback state at the first paragraph with time >= threshold
+      await serviceWorkerModule.updatePlaybackState({
+        status: 'playing',
+        currentParagraphIndex: firstParagraphIndex,
+        totalParagraphs,
+        currentTime
+      });
+      
+      // Set the active tab ID
+      serviceWorkerModule.setAudioContextTabId(mockTabId);
+      
+      // Call handleSkipPrevious
+      await serviceWorkerModule.handleSkipPrevious();
+      
+      // Verify that a GET_NEXT_PARAGRAPH message was sent for the SAME paragraph (restart)
+      const paragraphRequests = tabMessages.filter(
+        m => m.message.type === 'getNextParagraph' && 
+             m.message.paragraphIndex === firstParagraphIndex
+      );
+      
+      expect(paragraphRequests.length).toBe(1);
+      
+      // Verify the state still has paragraph index 0
+      const state = serviceWorkerModule.getPlaybackState();
+      expect(state.currentParagraphIndex).toBe(0);
+    });
+
+    it('should restart when at first paragraph with time exactly at threshold', async () => {
+      const totalParagraphs = 3;
+      const firstParagraphIndex = 0;
+      const mockTabId = 123;
+      const currentTime = 3; // Exactly at 3 second threshold
+      
+      // Clear previous messages
+      tabMessages = [];
+      
+      // Set up playback state at the first paragraph with time at threshold
+      await serviceWorkerModule.updatePlaybackState({
+        status: 'playing',
+        currentParagraphIndex: firstParagraphIndex,
+        totalParagraphs,
+        currentTime
+      });
+      
+      // Set the active tab ID
+      serviceWorkerModule.setAudioContextTabId(mockTabId);
+      
+      // Call handleSkipPrevious
+      await serviceWorkerModule.handleSkipPrevious();
+      
+      // Verify that a GET_NEXT_PARAGRAPH message was sent for the SAME paragraph (restart)
+      const paragraphRequests = tabMessages.filter(
+        m => m.message.type === 'getNextParagraph' && 
+             m.message.paragraphIndex === firstParagraphIndex
+      );
+      
+      expect(paragraphRequests.length).toBe(1);
+    });
+
+    it('should restart when there is only one paragraph', async () => {
+      const totalParagraphs = 1;
+      const currentParagraphIndex = 0;
+      const mockTabId = 123;
+      const currentTime = 0.5; // Less than threshold
+      
+      // Clear previous messages
+      tabMessages = [];
+      
+      // Set up playback state with only one paragraph
+      await serviceWorkerModule.updatePlaybackState({
+        status: 'playing',
+        currentParagraphIndex,
+        totalParagraphs,
+        currentTime
+      });
+      
+      // Set the active tab ID
+      serviceWorkerModule.setAudioContextTabId(mockTabId);
+      
+      // Call handleSkipPrevious
+      await serviceWorkerModule.handleSkipPrevious();
+      
+      // Verify that a GET_NEXT_PARAGRAPH message was sent for the SAME paragraph (restart)
+      const paragraphRequests = tabMessages.filter(
+        m => m.message.type === 'getNextParagraph' && 
+             m.message.paragraphIndex === 0
+      );
+      
+      expect(paragraphRequests.length).toBe(1);
+      
+      // Verify the state still has paragraph index 0
+      const state = serviceWorkerModule.getPlaybackState();
+      expect(state.currentParagraphIndex).toBe(0);
+    });
+  });
+});

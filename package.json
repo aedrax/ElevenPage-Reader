@@ -4,10 +4,13 @@
   "description": "Chrome Extension that converts web pages to audio using ElevenLabs AI voices",
   "type": "module",
   "scripts": {
+    "build": "node esbuild.config.js",
+    "build:watch": "node esbuild.config.js --watch",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "devDependencies": {
+    "esbuild": "^0.27.2",
     "fast-check": "^3.15.0",
     "jsdom": "^27.4.0",
     "vitest": "^1.6.0"
