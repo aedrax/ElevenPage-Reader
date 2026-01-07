@@ -60,33 +60,14 @@ const PROCESSED_ATTR = 'data-elevenlabs-processed';
 
 /**
  * Selectors for paragraph-like elements
- * Includes headings, list items, and other block-level text elements
  */
 const PARAGRAPH_SELECTORS = [
-  // Headings
-  'article h1', 'article h2', 'article h3', 'article h4', 'article h5', 'article h6',
-  'main h1', 'main h2', 'main h3', 'main h4', 'main h5', 'main h6',
-  '.content h1', '.content h2', '.content h3', '.content h4', '.content h5', '.content h6',
-  '.markdown-body h1', '.markdown-body h2', '.markdown-body h3', '.markdown-body h4', '.markdown-body h5', '.markdown-body h6',
-  // List items
-  'article li',
-  'main li',
-  '.content li',
-  '.markdown-body li',
-  '.post-content li',
-  '.entry-content li',
-  '.article-body li',
-  // Paragraphs (most specific first)
   'article p',
   'main p',
   '.content p',
-  '.markdown-body p',
   '.post-content p',
   '.entry-content p',
   '.article-body p',
-  // Fallback generic selectors
-  'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-  'li',
   'p'
 ];
 
