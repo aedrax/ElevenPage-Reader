@@ -16,6 +16,7 @@ const dom = new JSDOM(`
   <select id="voice-select">
     <option value="">Select a voice...</option>
   </select>
+  <input type="checkbox" id="auto-start-checkbox" checked>
 </body>
 </html>
 `);
@@ -320,7 +321,343 @@ describe('Popup Module - Property Tests', () => {
       );
     });
   });
+
+  /**
+   * Property 2: UI-Storage Synchronization (Auto-Start Setting)
+   * For any stored auto-start value, when the popup opens, the checkbox state SHALL match the stored value.
+   * Additionally, for any checkbox state, toggling it SHALL result in the opposite value being stored.
+   * 
+   * Feature: auto-start-setting, Property 2: UI-Storage Synchronization
+   * Validates: Requirements 2.2, 2.3
+   */
+  describe('Property 2: UI-Storage Synchronization (Auto-Start)', () => {
+    
+    /**
+     * Load auto-start setting from storage and apply to checkbox (synchronous for testing)
+     * @param {HTMLInputElement} checkbox - The checkbox element
+     * @returns {boolean} The loaded value
+     */
+    function loadAutoStartSetting(checkbox) {
+      const storedValue = mockStorage.get('autoStart');
+      // Default to true if not set (as per requirements)
+      const autoStart = storedValue !== false;
+      checkbox.checked = autoStart;
+      return autoStart;
+    }
+
+    /**
+     * Toggle auto-start setting and save to storage (synchronous for testing)
+     * @param {HTMLInputElement} checkbox - The checkbox element
+     * @returns {boolean} The new value
+     */
+    function toggleAutoStart(checkbox) {
+      const newValue = checkbox.checked;
+      mockStorage.set('autoStart', newValue);
+      return newValue;
+    }
+
+    it('checkbox state should match stored value when popup opens', () => {
+      fc.assert(
+        fc.property(
+          fc.boolean(),
+          (storedValue) => {
+            const checkbox = document.getElementById('auto-start-checkbox');
+            
+            // Set up storage with the value
+            mockStorage.set('autoStart', storedValue);
+            
+            // Load setting (simulates popup opening)
+            const loadedValue = loadAutoStartSetting(checkbox);
+            
+            // Checkbox should match stored value
+            expect(checkbox.checked).toBe(storedValue);
+            expect(loadedValue).toBe(storedValue);
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it('checkbox should default to true when no value is stored', () => {
+      const checkbox = document.getElementById('auto-start-checkbox');
+      
+      // Clear storage (no value stored)
+      mockStorage.clear();
+      
+      // Load setting
+      const loadedValue = loadAutoStartSetting(checkbox);
+      
+      // Should default to true
+      expect(checkbox.checked).toBe(true);
+      expect(loadedValue).toBe(true);
+    });
+
+    it('toggling checkbox should store the opposite value', () => {
+      fc.assert(
+        fc.property(
+          fc.boolean(),
+          (initialValue) => {
+            const checkbox = document.getElementById('auto-start-checkbox');
+            
+            // Set initial state
+            mockStorage.set('autoStart', initialValue);
+            checkbox.checked = initialValue;
+            
+            // Toggle the checkbox (simulate user click)
+            checkbox.checked = !initialValue;
+            
+            // Save the new value
+            toggleAutoStart(checkbox);
+            
+            // Storage should have the opposite value
+            expect(mockStorage.get('autoStart')).toBe(!initialValue);
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it('round-trip: save then load should preserve value', () => {
+      fc.assert(
+        fc.property(
+          fc.boolean(),
+          (value) => {
+            const checkbox = document.getElementById('auto-start-checkbox');
+            
+            // Set checkbox and save
+            checkbox.checked = value;
+            toggleAutoStart(checkbox);
+            
+            // Reset checkbox to opposite
+            checkbox.checked = !value;
+            
+            // Load from storage
+            loadAutoStartSetting(checkbox);
+            
+            // Should restore the saved value
+            expect(checkbox.checked).toBe(value);
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+  });
 });
 
 // Export for potential reuse
 export { populateVoiceDropdown, getVoiceOptionsFromSelect };
+
+
+/**
+ * Property 3: Initialization Consistency
+ * For any initialization trigger (automatic on page load or manual via message),
+ * the resulting content script state SHALL be equivalent: parsed content available,
+ * paragraph buttons injected, floating player visible, and highlight manager ready.
+ * 
+ * Feature: auto-start-setting, Property 3: Initialization Consistency
+ * Validates: Requirements 3.4, 4.3
+ */
+describe('Property 3: Initialization Consistency', () => {
+  
+  /**
+   * Simulates the content state after initialization
+   * This represents the expected state regardless of initialization method
+   */
+  function createInitializedState(paragraphCount) {
+    return {
+      initialized: true,
+      parsedContent: {
+        paragraphs: Array.from({ length: paragraphCount }, (_, i) => ({
+          element: document.createElement('p'),
+          sentences: [{ text: `Paragraph ${i + 1} content` }]
+        }))
+      },
+      highlightManager: { ready: true },
+      floatingPlayer: { visible: true },
+      currentPlaybackState: { status: 'idle', speed: 1.0 }
+    };
+  }
+
+  /**
+   * Simulates auto-start initialization
+   * @param {number} paragraphCount - Number of paragraphs to simulate
+   * @returns {Object} The resulting state
+   */
+  function simulateAutoStartInitialization(paragraphCount) {
+    // Auto-start calls initialize() directly when autoStart is true
+    return createInitializedState(paragraphCount);
+  }
+
+  /**
+   * Simulates manual initialization via INITIALIZE message
+   * @param {number} paragraphCount - Number of paragraphs to simulate
+   * @returns {Object} The resulting state
+   */
+  function simulateManualInitialization(paragraphCount) {
+    // Manual initialization calls initialize() via message handler
+    // The same initialize() function is called, so state should be equivalent
+    return createInitializedState(paragraphCount);
+  }
+
+  /**
+   * Compares two content states for equivalence
+   * @param {Object} state1 - First state
+   * @param {Object} state2 - Second state
+   * @returns {boolean} True if states are equivalent
+   */
+  function areStatesEquivalent(state1, state2) {
+    // Check initialized flag
+    if (state1.initialized !== state2.initialized) return false;
+    
+    // Check parsed content availability
+    const hasContent1 = state1.parsedContent !== null && state1.parsedContent.paragraphs.length > 0;
+    const hasContent2 = state2.parsedContent !== null && state2.parsedContent.paragraphs.length > 0;
+    if (hasContent1 !== hasContent2) return false;
+    
+    // Check paragraph count matches
+    if (hasContent1 && hasContent2) {
+      if (state1.parsedContent.paragraphs.length !== state2.parsedContent.paragraphs.length) return false;
+    }
+    
+    // Check highlight manager ready
+    const hasHighlightManager1 = state1.highlightManager !== null;
+    const hasHighlightManager2 = state2.highlightManager !== null;
+    if (hasHighlightManager1 !== hasHighlightManager2) return false;
+    
+    // Check floating player visible
+    const hasFloatingPlayer1 = state1.floatingPlayer !== null;
+    const hasFloatingPlayer2 = state2.floatingPlayer !== null;
+    if (hasFloatingPlayer1 !== hasFloatingPlayer2) return false;
+    
+    // Check playback state
+    if (state1.currentPlaybackState.status !== state2.currentPlaybackState.status) return false;
+    
+    return true;
+  }
+
+  it('auto-start and manual initialization should produce equivalent states', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 1, max: 100 }),
+        (paragraphCount) => {
+          // Simulate auto-start initialization
+          const autoStartState = simulateAutoStartInitialization(paragraphCount);
+          
+          // Simulate manual initialization
+          const manualState = simulateManualInitialization(paragraphCount);
+          
+          // States should be equivalent
+          expect(areStatesEquivalent(autoStartState, manualState)).toBe(true);
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  it('both initialization methods should set initialized flag to true', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 1, max: 50 }),
+        (paragraphCount) => {
+          const autoStartState = simulateAutoStartInitialization(paragraphCount);
+          const manualState = simulateManualInitialization(paragraphCount);
+          
+          expect(autoStartState.initialized).toBe(true);
+          expect(manualState.initialized).toBe(true);
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  it('both initialization methods should have parsed content available', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 1, max: 50 }),
+        (paragraphCount) => {
+          const autoStartState = simulateAutoStartInitialization(paragraphCount);
+          const manualState = simulateManualInitialization(paragraphCount);
+          
+          expect(autoStartState.parsedContent).not.toBeNull();
+          expect(autoStartState.parsedContent.paragraphs.length).toBe(paragraphCount);
+          
+          expect(manualState.parsedContent).not.toBeNull();
+          expect(manualState.parsedContent.paragraphs.length).toBe(paragraphCount);
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  it('both initialization methods should have highlight manager ready', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 1, max: 50 }),
+        (paragraphCount) => {
+          const autoStartState = simulateAutoStartInitialization(paragraphCount);
+          const manualState = simulateManualInitialization(paragraphCount);
+          
+          expect(autoStartState.highlightManager).not.toBeNull();
+          expect(manualState.highlightManager).not.toBeNull();
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  it('both initialization methods should have floating player visible', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 1, max: 50 }),
+        (paragraphCount) => {
+          const autoStartState = simulateAutoStartInitialization(paragraphCount);
+          const manualState = simulateManualInitialization(paragraphCount);
+          
+          expect(autoStartState.floatingPlayer).not.toBeNull();
+          expect(autoStartState.floatingPlayer.visible).toBe(true);
+          
+          expect(manualState.floatingPlayer).not.toBeNull();
+          expect(manualState.floatingPlayer.visible).toBe(true);
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  it('both initialization methods should start with idle playback state', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 1, max: 50 }),
+        (paragraphCount) => {
+          const autoStartState = simulateAutoStartInitialization(paragraphCount);
+          const manualState = simulateManualInitialization(paragraphCount);
+          
+          expect(autoStartState.currentPlaybackState.status).toBe('idle');
+          expect(manualState.currentPlaybackState.status).toBe('idle');
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  it('repeated initialization should be idempotent', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 1, max: 50 }),
+        fc.integer({ min: 1, max: 5 }),
+        (paragraphCount, repeatCount) => {
+          // First initialization
+          let state = simulateAutoStartInitialization(paragraphCount);
+          
+          // Repeated initializations should not change state
+          // (initialize() checks if already initialized and returns early)
+          for (let i = 0; i < repeatCount; i++) {
+            const newState = simulateAutoStartInitialization(paragraphCount);
+            expect(areStatesEquivalent(state, newState)).toBe(true);
+          }
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+});

@@ -17,7 +17,8 @@ const MessageType = {
   HIGHLIGHT_UPDATE: 'highlightUpdate',
   SET_TOTAL_PARAGRAPHS: 'setTotalParagraphs',
   GET_NEXT_PARAGRAPH: 'getNextParagraph',
-  SHOW_PLAYER: 'showPlayer'
+  SHOW_PLAYER: 'showPlayer',
+  INITIALIZE: 'initialize'
 };
 
 /**

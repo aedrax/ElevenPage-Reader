@@ -24,6 +24,25 @@ let contentState = {
   currentPlaybackState: { status: PlaybackStatus.IDLE, speed: 1.0 }
 };
 
+/**
+ * Check if auto-start is enabled in storage
+ * Defaults to true if not set or on error
+ * @returns {Promise<boolean>}
+ */
+async function shouldAutoStart() {
+  return new Promise((resolve) => {
+    if (typeof chrome !== 'undefined' && chrome.storage) {
+      chrome.storage.local.get(['autoStart'], (result) => {
+        // Default to true if not set
+        resolve(result.autoStart !== false);
+      });
+    } else {
+      // Default to true if chrome.storage is not available
+      resolve(true);
+    }
+  });
+}
+
 async function sendMessage(message) {
   return new Promise((resolve) => {
     if (typeof chrome !== 'undefined' && chrome.runtime) {
@@ -230,6 +249,15 @@ function setupMessageListener() {
   if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       switch (message.type) {
+        case MessageType.INITIALIZE:
+          // Handle manual initialization request
+          (async () => {
+            if (!contentState.initialized) {
+              await initialize();
+            }
+            sendResponse({ success: true, initialized: contentState.initialized });
+          })();
+          return true; // Keep channel open for async response
         case MessageType.HIGHLIGHT_UPDATE:
           handleHighlightUpdate(message);
           sendResponse({ received: true });
@@ -293,15 +321,27 @@ function setupUnloadListener() {
   });
 }
 
+/**
+ * Conditionally initialize based on auto-start setting
+ */
+async function conditionalInitialize() {
+  const autoStart = await shouldAutoStart();
+  if (autoStart) {
+    await initialize();
+  } else {
+    console.log('ElevenPage Reader: Auto-start disabled, waiting for manual activation');
+  }
+}
+
 // Initialize
 setupMessageListener();
 setupVisibilityListener();
 setupUnloadListener();
 
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initialize);
+  document.addEventListener('DOMContentLoaded', conditionalInitialize);
 } else {
-  initialize();
+  conditionalInitialize();
 }
 
 console.log('ElevenPage Reader content script loaded');

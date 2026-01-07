@@ -15,7 +15,8 @@ const MessageType = {
   SET_VOICE: 'setVoice',
   PLAYBACK_STATE_CHANGE: 'playbackStateChange',
   SET_AUTO_CONTINUE: 'setAutoContinue',
-  SHOW_PLAYER: 'showPlayer'
+  SHOW_PLAYER: 'showPlayer',
+  INITIALIZE: 'initialize'
 };
 
 /**
@@ -36,7 +37,8 @@ const STORAGE_KEYS = {
   API_KEY: 'apiKey',
   SELECTED_VOICE_ID: 'selectedVoiceId',
   PLAYBACK_SPEED: 'playbackSpeed',
-  AUTO_CONTINUE: 'autoContinue'
+  AUTO_CONTINUE: 'autoContinue',
+  AUTO_START: 'autoStart'
 };
 
 /**
@@ -81,6 +83,7 @@ class PopupController {
       pauseIcon: document.querySelector('.pause-icon'),
       statusIndicator: document.querySelector('.status-indicator'),
       statusText: document.querySelector('.status-text'),
+      autoStartCheckbox: document.getElementById('auto-start-checkbox'),
       autoContinueCheckbox: document.getElementById('auto-continue-checkbox'),
       showPlayerBtn: document.getElementById('show-player-btn')
     };
@@ -110,6 +113,9 @@ class PopupController {
     // Auto-continue event
     this.elements.autoContinueCheckbox.addEventListener('change', () => this.toggleAutoContinue());
 
+    // Auto-start event
+    this.elements.autoStartCheckbox.addEventListener('change', () => this.toggleAutoStart());
+
     // Show player button
     this.elements.showPlayerBtn.addEventListener('click', () => this.showPlayer());
   }
@@ -122,7 +128,8 @@ class PopupController {
       const result = await chrome.storage.local.get([
         STORAGE_KEYS.API_KEY,
         STORAGE_KEYS.SELECTED_VOICE_ID,
-        STORAGE_KEYS.PLAYBACK_SPEED
+        STORAGE_KEYS.PLAYBACK_SPEED,
+        STORAGE_KEYS.AUTO_START
       ]);
 
       // Load API key (masked)
@@ -139,6 +146,10 @@ class PopupController {
       if (result[STORAGE_KEYS.PLAYBACK_SPEED]) {
         this.elements.speedSelect.value = result[STORAGE_KEYS.PLAYBACK_SPEED];
       }
+
+      // Load auto-start setting (default to true)
+      const autoStart = result[STORAGE_KEYS.AUTO_START];
+      this.elements.autoStartCheckbox.checked = autoStart !== false;
 
       // Pre-select saved voice after voices are loaded
       if (result[STORAGE_KEYS.SELECTED_VOICE_ID]) {
@@ -417,10 +428,35 @@ class PopupController {
   }
 
   /**
+   * Toggle auto-start setting
+   */
+  async toggleAutoStart() {
+    const autoStart = this.elements.autoStartCheckbox.checked;
+
+    try {
+      await chrome.storage.local.set({ [STORAGE_KEYS.AUTO_START]: autoStart });
+    } catch (error) {
+      // Revert checkbox state on error
+      this.elements.autoStartCheckbox.checked = !autoStart;
+      this.showError('Error updating auto-start setting');
+    }
+  }
+
+  /**
    * Show the floating player on the current page
+   * First triggers initialization (if not already initialized), then shows the player
    */
   async showPlayer() {
     try {
+      // First try to initialize (will be no-op if already initialized)
+      const initResponse = await this.sendMessage(MessageType.INITIALIZE, {});
+      
+      if (!initResponse.success) {
+        this.showError(initResponse.error || 'Could not initialize on this page');
+        return;
+      }
+      
+      // Then show the player
       const response = await this.sendMessage(MessageType.SHOW_PLAYER, {});
       
       if (!response.success) {

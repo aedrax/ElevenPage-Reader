@@ -234,4 +234,39 @@ describe('Storage Module - Property Tests', () => {
       );
     });
   });
+
+  /**
+   * Feature: auto-start-setting, Property 1: Storage Round-Trip Consistency
+   * For any boolean value (true or false), saving it as the auto-start setting
+   * and then retrieving it SHALL return the same value.
+   * Validates: Requirements 1.1, 1.2, 1.3
+   */
+  describe('Feature: auto-start-setting, Property 1: Storage Round-Trip Consistency', () => {
+    it('should have AUTO_START key defined in STORAGE_KEYS', () => {
+      expect(STORAGE_KEYS.AUTO_START).toBe('autoStart');
+    });
+
+    it('should have default value of true for AUTO_START', () => {
+      expect(DEFAULTS[STORAGE_KEYS.AUTO_START]).toBe(true);
+    });
+
+    it('should round-trip boolean values for auto-start setting', async () => {
+      await fc.assert(
+        fc.asyncProperty(
+          fc.boolean(),
+          async (autoStart) => {
+            // Store the auto-start value
+            await saveSettings(STORAGE_KEYS.AUTO_START, autoStart);
+            
+            // Retrieve the value
+            const retrieved = await getSettings(STORAGE_KEYS.AUTO_START);
+            
+            // Should be equivalent
+            expect(retrieved).toBe(autoStart);
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+  });
 });

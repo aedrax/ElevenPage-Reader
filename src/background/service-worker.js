@@ -29,6 +29,7 @@ const MessageType = {
   
   // UI control
   SHOW_PLAYER: 'showPlayer',
+  INITIALIZE: 'initialize',
   
   // Events to content script
   HIGHLIGHT_UPDATE: 'highlightUpdate',
@@ -654,6 +655,28 @@ async function handleShowPlayer(tabId) {
 }
 
 /**
+ * Handle INITIALIZE message
+ * Forwards initialization request to content script in active tab
+ * Used for manual activation when auto-start is disabled
+ * @returns {Promise<Object>}
+ */
+async function handleInitialize() {
+  // Get the active tab
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  
+  if (!tab?.id) {
+    return { success: false, error: 'No active tab found' };
+  }
+  
+  try {
+    const response = await chrome.tabs.sendMessage(tab.id, { type: MessageType.INITIALIZE });
+    return response || { success: false, error: 'No response from content script' };
+  } catch (error) {
+    return { success: false, error: 'Content script not loaded on this page' };
+  }
+}
+
+/**
  * Generate speech using ElevenLabs API
  * @param {string} apiKey - API key
  * @param {string} text - Text to convert
@@ -1078,6 +1101,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       case MessageType.SHOW_PLAYER:
         return handleShowPlayer(sender.tab?.id);
         
+      case MessageType.INITIALIZE:
+        return handleInitialize();
+        
       default:
         return { success: false, error: 'Unknown message type' };
     }
@@ -1138,6 +1164,7 @@ if (typeof module !== 'undefined' && module.exports) {
     handleJumpToParagraph,
     handleSkipNext,
     handleSkipPrevious,
+    handleInitialize,
     requestAndPlayParagraph,
     handleAudioEnded,
     requestNextParagraph,
