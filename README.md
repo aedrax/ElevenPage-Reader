@@ -23,15 +23,25 @@ This extension integrates directly with your ElevenLabs account, allowing you to
 Before installing, ensure you have:
 
 1. **Google Chrome** (or a Chromium-based browser like Brave or Edge).  
-2. **Node.js** (for building the extension).
-3. An **ElevenLabs Account** with an active API Key.  
+2. An **ElevenLabs Account** with an active API Key.  
    * Get your API key here: **[ElevenLabs API Keys](https://elevenlabs.io/app/developers/api-keys)**
    * When creating your API key, ensure the **"Voices" section has "Read" access** enabled. This is required for the extension to fetch your available voices.
    * *Note: Word-level highlighting requires the ElevenLabs API to return timestamp information. Ensure your tier supports the required latency/features.*
 
-## **🚀 Installation (Developer Mode)**
+## **🚀 Installation**
 
-Since this is a local project, you will install it as an "Unpacked Extension."
+### **Option 1: Download from Releases (Recommended)**
+
+1. Go to the [Releases page](https://github.com/aedrax/elevenpage-reader/releases).
+2. Download the latest `elevenpage-reader-extension.zip` file.
+3. Extract the ZIP file to a folder on your computer.
+4. Open Chrome and navigate to `chrome://extensions`.
+5. Toggle **Developer mode** in the top right corner.
+6. Click the **Load unpacked** button.
+7. Select the extracted folder.
+8. The extension icon should now appear in your browser toolbar.
+
+### **Option 2: Build from Source (For Developers)**
 
 1. **Clone or Download** this repository to your local machine.  
 2. **Install dependencies and build:**
@@ -126,6 +136,18 @@ To achieve word-level highlighting, the extension requests `with_timestamps=true
 └── README.md
 ```
 
+## **🔄 CI/CD**
+
+This project uses GitHub Actions for continuous integration:
+
+[![Build Extension](https://github.com/aedrax/elevenpage-reader/actions/workflows/build.yml/badge.svg)](https://github.com/aedrax/elevenpage-reader/actions/workflows/build.yml)
+
+On every push and pull request to `main`:
+- Dependencies are installed
+- Extension is built with esbuild
+- Tests are run with Vitest
+- Build artifacts are uploaded and available for download
+
 ## **🤝 Contributing**
 
 Contributions are welcome!
@@ -135,6 +157,8 @@ Contributions are welcome!
 3. Commit your changes.  
 4. Push to the branch.  
 5. Open a Pull Request.
+
+The CI pipeline will automatically build and test your changes.
 
 ## **📄 License**
 
