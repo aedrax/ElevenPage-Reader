@@ -25,7 +25,9 @@ Before installing, ensure you have:
 1. **Google Chrome** (or a Chromium-based browser like Brave or Edge).  
 2. An **ElevenLabs Account** with an active API Key.  
    * Get your API key here: **[ElevenLabs API Keys](https://elevenlabs.io/app/developers/api-keys)**
-   * When creating your API key, ensure the **"Voices" section has "Read" access** enabled. This is required for the extension to fetch your available voices.
+   * When creating your API key, ensure the following permissions are enabled:
+     * **"Text to Speech" section has "Access"** - Required for generating audio from text.
+     * **"Voices" section has "Read" access** - Required for the extension to fetch your available voices.
    * *Note: Word-level highlighting requires the ElevenLabs API to return timestamp information. Ensure your tier supports the required latency/features.*
 
 ## **🚀 Installation**
