@@ -94,6 +94,12 @@ class PopupController {
         STORAGE_KEYS.AUTO_START
       ]);
 
+      // Remember the saved voice before loading voices, so the dropdown
+      // pre-selects it when it is populated
+      if (result[STORAGE_KEYS.SELECTED_VOICE_ID]) {
+        this.elements.voiceSelect.dataset.savedVoiceId = result[STORAGE_KEYS.SELECTED_VOICE_ID];
+      }
+
       // Load API key (masked)
       if (result[STORAGE_KEYS.API_KEY]) {
         this.elements.apiKeyInput.value = this.maskApiKey(result[STORAGE_KEYS.API_KEY]);
@@ -112,11 +118,6 @@ class PopupController {
       // Load auto-start setting (default to true)
       const autoStart = result[STORAGE_KEYS.AUTO_START];
       this.elements.autoStartCheckbox.checked = autoStart !== false;
-
-      // Pre-select saved voice after voices are loaded
-      if (result[STORAGE_KEYS.SELECTED_VOICE_ID]) {
-        this.elements.voiceSelect.dataset.savedVoiceId = result[STORAGE_KEYS.SELECTED_VOICE_ID];
-      }
     } catch (error) {
       console.error('Error loading settings:', error);
     }
@@ -279,6 +280,8 @@ class PopupController {
       const response = await this.sendMessage(MessageType.SET_VOICE, { voiceId });
       
       if (response.success) {
+        // Keep the choice selected when the voice list is refreshed
+        this.elements.voiceSelect.dataset.savedVoiceId = voiceId;
         this.showStatus(this.elements.voiceStatus, 'Voice selected', 'success');
         this.updatePlaybackControls();
       } else {
