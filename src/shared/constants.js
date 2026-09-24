@@ -58,7 +58,8 @@ export const STORAGE_KEYS = {
   CACHED_VOICES: 'cachedVoices',
   VOICES_CACHED_AT: 'voicesCachedAt',
   AUTO_CONTINUE: 'autoContinue',
-  AUTO_START: 'autoStart'
+  AUTO_START: 'autoStart',
+  PLAYER_HIDDEN: 'playerHidden'
 };
 
 /**

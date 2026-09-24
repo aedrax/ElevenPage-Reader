@@ -319,3 +319,23 @@ describe('FloatingPlayer - Button Creation and Ordering', () => {
     });
   });
 });
+
+describe('FloatingPlayer - closing the player', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  describe('user clicks × to get the player out of the way', () => {
+    it('hides it and reports the close so the choice can outlive a page reload', () => {
+      const onClose = vi.fn();
+      const player = new FloatingPlayer({ onClose });
+      player.show();
+
+      player.container.querySelector('.elevenlabs-fp-close').click();
+
+      expect(player.isVisible()).toBe(false);
+      expect(onClose).toHaveBeenCalledTimes(1);
+      player.destroy();
+    });
+  });
+});

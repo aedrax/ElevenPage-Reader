@@ -12,7 +12,12 @@ const SPEED_OPTIONS = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0];
  * FloatingPlayer class manages the floating control overlay
  */
 class FloatingPlayer {
-  constructor() {
+  /**
+   * @param {Object} [options]
+   * @param {Function} [options.onClose] - Called when the user closes the player
+   */
+  constructor({ onClose } = {}) {
+    this.onClose = onClose;
     this.container = null;
     this.skipPreviousButton = null;
     this.playPauseButton = null;
@@ -61,7 +66,10 @@ class FloatingPlayer {
     closeBtn.className = 'elevenlabs-fp-close';
     closeBtn.innerHTML = '&times;';
     closeBtn.title = 'Hide player';
-    closeBtn.addEventListener('click', () => this.hide());
+    closeBtn.addEventListener('click', () => {
+      this.hide();
+      this.onClose?.();
+    });
     header.appendChild(closeBtn);
     
     container.appendChild(header);

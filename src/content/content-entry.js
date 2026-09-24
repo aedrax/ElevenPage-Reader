@@ -9,6 +9,7 @@ import {
 import { HighlightManager } from './highlight-manager.js';
 import { injectButtons, removeButtons } from './paragraph-buttons.js';
 import { FloatingPlayer, MessageType, PlaybackStatus } from './floating-player.js';
+import { STORAGE_KEYS } from '../shared/constants.js';
 
 // ============================================================================
 // CONTENT SCRIPT STATE AND MAIN LOGIC
@@ -39,6 +40,29 @@ async function shouldAutoStart() {
       resolve(true);
     }
   });
+}
+
+/**
+ * Whether the user closed the floating player. Closing it is remembered
+ * across page loads until they choose "Show Player on Page" in the popup.
+ * @returns {Promise<boolean>}
+ */
+async function isPlayerHidden() {
+  return new Promise((resolve) => {
+    if (typeof chrome !== 'undefined' && chrome.storage) {
+      chrome.storage.local.get([STORAGE_KEYS.PLAYER_HIDDEN], (result) => {
+        resolve(result?.[STORAGE_KEYS.PLAYER_HIDDEN] === true);
+      });
+    } else {
+      resolve(false);
+    }
+  });
+}
+
+function setPlayerHidden(hidden) {
+  if (typeof chrome !== 'undefined' && chrome.storage) {
+    chrome.storage.local.set({ [STORAGE_KEYS.PLAYER_HIDDEN]: hidden });
+  }
 }
 
 async function sendMessage(message) {
@@ -126,8 +150,12 @@ async function initialize() {
     contentState.highlightManager = new HighlightManager();
     contentState.highlightManager.setParsedContent(contentState.parsedContent);
     injectButtons(contentState.parsedContent.paragraphs);
-    contentState.floatingPlayer = new FloatingPlayer();
-    contentState.floatingPlayer.show();
+    contentState.floatingPlayer = new FloatingPlayer({
+      onClose: () => setPlayerHidden(true)
+    });
+    if (!(await isPlayerHidden())) {
+      contentState.floatingPlayer.show();
+    }
     
     const response = await sendMessage({ type: MessageType.GET_STATE });
     if (response && response.success && response.state) {
@@ -266,6 +294,7 @@ function setupMessageListener() {
           sendResponse(response);
           break;
         case MessageType.SHOW_PLAYER:
+          setPlayerHidden(false);
           if (contentState.floatingPlayer) {
             contentState.floatingPlayer.show();
           }
