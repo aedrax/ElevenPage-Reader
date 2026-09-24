@@ -4,7 +4,8 @@
  * Feature: elevenlabs-reader
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+const context = describe;
 import * as fc from 'fast-check';
 
 // Mock Chrome APIs
@@ -2370,5 +2371,80 @@ describe('Service Worker Suspension Recovery', () => {
     expect(persisted.status).toBe('paused');
     expect(persisted.currentParagraphIndex).toBe(4);
     expect(persisted.currentTime).toBe(8.25);
+  });
+});
+
+describe('Play pressed without a paragraph (popup / floating player)', () => {
+  const originalSendMessage = chromeMock.tabs.sendMessage.getMockImplementation();
+  let ttsRequests;
+
+  beforeEach(async () => {
+    mockStorage.clear();
+    mockSessionStorage.clear();
+    vi.clearAllMocks();
+    tabMessages = [];
+    ttsRequests = [];
+    mockStorage.set('apiKey', 'test-key');
+    mockStorage.set('selectedVoiceId', 'voice-1');
+    await serviceWorkerModule.handleStop();
+
+    globalThis.fetch = vi.fn(async (url, init) => {
+      ttsRequests.push(JSON.parse(init.body).text);
+      return {
+        ok: true,
+        text: async () => JSON.stringify({ audio_base64: 'QUJD', alignment: { characters: [] } })
+      };
+    });
+  });
+
+  afterEach(() => {
+    chromeMock.tabs.sendMessage.mockImplementation(originalSendMessage);
+    delete globalThis.fetch;
+  });
+
+  const pageRespondsWith = (playTextResponse) => {
+    chromeMock.tabs.query.mockResolvedValue([{ id: 55 }]);
+    chromeMock.tabs.sendMessage.mockImplementation((tabId, message) => {
+      tabMessages.push({ tabId, message });
+      if (message.type === 'getPlayText') return Promise.resolve(playTextResponse);
+      return Promise.resolve();
+    });
+  };
+
+  context('user highlighted text on the page, then pressed Play in the popup', () => {
+    it('reads the selected text from the active tab instead of failing with "No text to play"', async () => {
+      pageRespondsWith({ success: true, text: 'Selected words', paragraphIndex: 0, selection: true });
+
+      const result = await serviceWorkerModule.handlePlay({ tabId: undefined });
+
+      expect(result).toEqual({ success: true });
+      expect(ttsRequests).toEqual(['Selected words']);
+      expect(tabMessages.some(m => m.tabId === 55 && m.message.type === 'getPlayText')).toBe(true);
+      expect(serviceWorkerModule.getPlaybackState().selectionMode).toBe(true);
+    });
+
+    it('stops after the selection instead of auto-continuing into unrelated paragraphs', async () => {
+      pageRespondsWith({ success: true, text: 'Selected words', paragraphIndex: 0, selection: true });
+      await serviceWorkerModule.handleSetTotalParagraphs({ totalParagraphs: 5 });
+      await serviceWorkerModule.handlePlay({ tabId: undefined });
+      tabMessages = [];
+
+      await serviceWorkerModule.handleAudioEnded();
+
+      expect(serviceWorkerModule.getPlaybackState().status).toBe('idle');
+      expect(tabMessages.some(m => m.message.type === 'getNextParagraph')).toBe(false);
+    });
+  });
+
+  context('page has neither a selection nor readable paragraphs', () => {
+    it('explains how to start instead of a bare "No text to play"', async () => {
+      pageRespondsWith({ success: false });
+
+      const result = await serviceWorkerModule.handlePlay({ tabId: undefined });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/Select text/);
+      expect(ttsRequests).toEqual([]);
+    });
   });
 });

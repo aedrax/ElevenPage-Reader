@@ -26,6 +26,7 @@ export const MessageType = {
 
   // Auto-continue
   GET_NEXT_PARAGRAPH: 'getNextParagraph',
+  GET_PLAY_TEXT: 'getPlayText',
   SET_TOTAL_PARAGRAPHS: 'setTotalParagraphs',
 
   // UI control

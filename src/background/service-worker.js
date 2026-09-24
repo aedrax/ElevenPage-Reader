@@ -23,7 +23,8 @@ let playbackState = {
   speed: 1.0,
   error: null,
   autoContinue: true,
-  totalParagraphs: 0
+  totalParagraphs: 0,
+  selectionMode: false    // Playing user-selected text rather than a parsed paragraph
 };
 
 /**
@@ -92,8 +93,9 @@ async function initiatePreload(currentParagraphIndex) {
   const { autoContinue, totalParagraphs } = playbackState;
   const nextIndex = currentParagraphIndex + 1;
   
-  // Only preload if auto-continue is enabled and there's a next paragraph
-  if (!autoContinue || nextIndex >= totalParagraphs) {
+  // Only preload if auto-continue is enabled and there's a next paragraph.
+  // Selected text is read on its own, so there is nothing to continue into.
+  if (playbackState.selectionMode || !autoContinue || nextIndex >= totalParagraphs) {
     return;
   }
   
@@ -366,6 +368,41 @@ function getCurrentPlaybackState() {
 
 
 /**
+ * Ask a tab's content script what to read when Play is pressed without text:
+ * the current text selection, or else the first parsed paragraph.
+ * Messages from the popup carry no sender tab, so fall back to the active tab.
+ * @param {number|undefined} tabId - Tab the request came from, if any
+ * @returns {Promise<Object>} { success, tabId, text, paragraphIndex, selection } or { success, error }
+ */
+async function requestPlayText(tabId) {
+  const noTextError = 'No text to play. Select text on the page or click a paragraph.';
+  try {
+    if (!tabId) {
+      const [activeTab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+      tabId = activeTab?.id;
+    }
+    if (!tabId) {
+      return { success: false, error: noTextError };
+    }
+    const response = await chrome.tabs.sendMessage(tabId, { type: MessageType.GET_PLAY_TEXT });
+    if (!response?.success || !response.text?.trim()) {
+      return { success: false, error: response?.error || noTextError };
+    }
+    return {
+      success: true,
+      tabId,
+      text: response.text,
+      paragraphIndex: response.paragraphIndex ?? 0,
+      selection: !!response.selection
+    };
+  } catch (error) {
+    // No content script on this page (e.g. chrome:// pages, or not reloaded
+    // since the extension was installed)
+    return { success: false, error: noTextError };
+  }
+}
+
+/**
  * Handle PLAY message
  * @param {Object} payload - Play request payload
  * @param {number} payload.tabId - Tab ID to play in
@@ -374,7 +411,7 @@ function getCurrentPlaybackState() {
  * @returns {Promise<Object>}
  */
 async function handlePlay(payload) {
-  const { tabId, text, paragraphIndex = 0 } = payload;
+  let { tabId, text, paragraphIndex = 0, selection = false } = payload;
   
   // Check if already playing
   if (playbackState.status === PlaybackStatus.PLAYING) {
@@ -420,8 +457,14 @@ async function handlePlay(payload) {
     return { success: false, error: 'Voice not selected' };
   }
   
+  // Play pressed without text (popup / floating player): ask the page for
+  // the user's selection, falling back to the first paragraph
   if (!text || text.trim().length === 0) {
-    return { success: false, error: 'No text to play' };
+    const resolved = await requestPlayText(tabId);
+    if (!resolved.success) {
+      return { success: false, error: resolved.error };
+    }
+    ({ tabId, text, paragraphIndex, selection } = resolved);
   }
 
   const generation = ++playbackGeneration;
@@ -438,7 +481,8 @@ async function handlePlay(payload) {
     currentSentenceIndex: 0,
     currentWordIndex: 0,
     currentTime: 0,
-    error: null
+    error: null,
+    selectionMode: !!selection
   });
 
   audioContext.tabId = tabId;
@@ -524,7 +568,8 @@ async function handleStop() {
     currentSentenceIndex: 0,
     currentWordIndex: 0,
     currentTime: 0,
-    error: null
+    error: null,
+    selectionMode: false
   });
   
   return { success: true };
@@ -936,7 +981,7 @@ async function requestNextParagraph(paragraphIndex) {
  * @returns {Promise<void>}
  */
 async function handleAudioEnded() {
-  const { autoContinue, currentParagraphIndex, totalParagraphs } = playbackState;
+  const { autoContinue, currentParagraphIndex, totalParagraphs, selectionMode } = playbackState;
   
   // First, clean up the current audio state
   audioContext.audioData = null;
@@ -944,7 +989,7 @@ async function handleAudioEnded() {
   await persistAudioContext();
 
   // Check if auto-continue is enabled and there's a next paragraph
-  if (!autoContinue || currentParagraphIndex >= totalParagraphs - 1) {
+  if (selectionMode || !autoContinue || currentParagraphIndex >= totalParagraphs - 1) {
     // Stop playback - either auto-continue is disabled or we're at the last paragraph
     clearPreloadState();
     await handleStop();
@@ -1055,6 +1100,8 @@ async function handleOffscreenMessage(message) {
  */
 async function broadcastHighlightUpdate(currentTime) {
   if (!audioContext.tabId || !audioContext.alignmentData) return;
+  // Selected text has no word spans to highlight
+  if (playbackState.selectionMode) return;
   
   const message = {
     type: MessageType.HIGHLIGHT_UPDATE,

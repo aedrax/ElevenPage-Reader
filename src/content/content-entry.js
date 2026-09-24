@@ -217,6 +217,30 @@ function handleGetNextParagraph(message) {
   return { success: true, text, paragraphIndex };
 }
 
+/**
+ * Handle GET_PLAY_TEXT message from service worker
+ * Sent when Play is pressed in the popup or floating player without a
+ * paragraph: read the user's text selection if there is one, otherwise
+ * start from the first parsed paragraph.
+ * @returns {Object} Response with success, text, paragraphIndex, selection, or error
+ */
+function handleGetPlayText() {
+  const selectedText = window.getSelection()?.toString().trim();
+  if (selectedText) {
+    return { success: true, text: selectedText, paragraphIndex: 0, selection: true };
+  }
+
+  const firstParagraph = handleGetNextParagraph({ paragraphIndex: 0 });
+  if (firstParagraph.success) {
+    return { ...firstParagraph, selection: false };
+  }
+
+  return {
+    success: false,
+    error: 'No text to play. Select text on the page or click a paragraph.'
+  };
+}
+
 function handlePlaybackStateChange(message) {
   const { state: playbackState } = message;
   if (!playbackState) return;
@@ -264,6 +288,9 @@ function setupMessageListener() {
         case MessageType.GET_NEXT_PARAGRAPH:
           const response = handleGetNextParagraph(message);
           sendResponse(response);
+          break;
+        case MessageType.GET_PLAY_TEXT:
+          sendResponse(handleGetPlayText());
           break;
         case MessageType.SHOW_PLAYER:
           if (contentState.floatingPlayer) {
